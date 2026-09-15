@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": ["@webbtc/webln-types"],
+    "baseUrl": "..",
+    "paths": { "@kaleidorg/wallet-provider-types": ["./index.d.ts"] }
+  },
+  "include": ["./consumer.ts", "../index.d.ts"]
+}

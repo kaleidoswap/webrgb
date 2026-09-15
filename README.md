@@ -4,6 +4,10 @@
 
 The reference implementation is the [KaleidoSwap browser extension](https://docs.kaleidoswap.com/extensions/kaleidoswap-extension/dapp-connectivity). This package ships the TypeScript declarations and a small `requestProvider()` helper.
 
+## Try it
+
+The [playground](https://kaleidoswap.github.io/webrgb/) imports this module and exercises every `window.rgb` method against the wallet you have installed, with a live log of calls, results and error codes. Use a signet or regtest wallet.
+
 ## Install
 
 ```bash

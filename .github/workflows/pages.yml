@@ -1,0 +1,51 @@
+name: Pages
+
+# Publishes the playground at https://kaleidoswap.github.io/webrgb/ — a static
+# page that imports this repository's index.js and drives whatever window.rgb
+# a wallet injects. It is the manual test bed for the library against the
+# KaleidoSwap extension; nothing on it talks to a server.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'index.js'
+      - 'index.d.ts'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The page imports the real module, not a copy kept in sync by hand.
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp site/index.html _site/
+          cp index.js _site/webrgb.js
+          cp index.d.ts _site/webrgb.d.ts
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

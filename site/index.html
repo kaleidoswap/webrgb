@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebRGB · Playground</title>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --panel: #131a22;
+        --panel2: #0f151c;
+        --border: #233140;
+        --text: #e6edf3;
+        --muted: #8b9bab;
+        --primary: #14e0c8;
+        --primary-ink: #04130f;
+        --warn: #f5a623;
+        --danger: #ff5d5d;
+        --ok: #36d399;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        z-index: 10;
+      }
+      header h1 { font-size: 16px; margin: 0; }
+      header h1 span { color: var(--primary); }
+      header a { color: var(--muted); font-size: 12px; }
+      .pill {
+        margin-left: auto;
+        font-size: 12px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+      .pill.on { color: var(--text); border-color: var(--primary); }
+      .pill.on .dot { background: var(--ok); }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px 20px 40px;
+      }
+      @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      section h2 { font-size: 14px; margin: 0 0 10px; color: var(--primary); }
+      .stack { display: grid; gap: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+      .field {
+        flex: 1 1 160px;
+        min-width: 0;
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 9px;
+        font: inherit;
+      }
+      button {
+        background: var(--primary);
+        color: var(--primary-ink);
+        border: 0;
+        border-radius: 8px;
+        padding: 7px 12px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .note { font-size: 12px; color: var(--muted); }
+      .note code { color: var(--text); }
+      #log {
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+        max-height: 70vh;
+        overflow: auto;
+        display: grid;
+        gap: 6px;
+      }
+      .entry { white-space: pre-wrap; word-break: break-word; border-left: 3px solid var(--border); padding-left: 8px; }
+      .entry.ok { border-color: var(--ok); }
+      .entry.err { border-color: var(--danger); }
+      .entry.call { border-color: var(--primary); }
+      .entry.evt { border-color: var(--warn); }
+      .entry .t { color: var(--muted); }
+      .entry .label { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>WebRGB <span>Playground</span></h1>
+      <a href="https://github.com/kaleidoswap/webrgb">github.com/kaleidoswap/webrgb</a>
+      <a href="https://docs.kaleidoswap.com/extensions/kaleidoswap-extension/dapp-connectivity">docs</a>
+      <span class="pill" id="pill"><span class="dot"></span>window.rgb</span>
+    </header>
+
+    <main>
+      <div class="stack">
+        <section>
+          <h2>Setup</h2>
+          <p class="note">
+            This page imports the published <code>@kaleidorg/webrgb</code> module from this same
+            deployment and drives whatever <code>window.rgb</code> a wallet injects. Install the
+            KaleidoSwap browser extension, unlock it, then press <code>requestProvider()</code>.
+            Every funds-touching call opens the wallet's confirmation popup; nothing here talks to a
+            server. Use a signet or regtest wallet.
+          </p>
+          <div class="row">
+            <button data-call="requestProvider">requestProvider()</button>
+            <button data-call="enable">enable()</button>
+            <button data-call="getInfo">getInfo()</button>
+            <button class="ghost" data-call="getAddress">getAddress()</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Assets</h2>
+          <div class="stack">
+            <div class="row">
+              <button data-call="listAssets">listAssets()</button>
+              <input class="field" id="asset" placeholder="rgb:… (auto-filled from listAssets)" />
+              <button class="ghost" data-call="getAssetBalance">getAssetBalance()</button>
+            </div>
+            <div>
+              <label>issueAsset — NIA only; needs a funded getAddress() UTXO</label>
+              <div class="row">
+                <input class="field" id="ticker" placeholder="TICKER" style="max-width: 110px" />
+                <input class="field" id="name" placeholder="Asset name" />
+                <input class="field" id="supply" type="number" placeholder="1000" style="max-width: 110px" />
+                <button data-call="issueAsset">issueAsset()</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>On-chain transfers</h2>
+          <div class="stack">
+            <div>
+              <label>blindReceive — amount (blank = any)</label>
+              <div class="row">
+                <input class="field" id="recv_amt" type="number" placeholder="1" style="max-width: 110px" />
+                <button data-call="blindReceive">blindReceive()</button>
+              </div>
+            </div>
+            <div>
+              <label>sendAsset — receiver's RGB invoice</label>
+              <div class="row">
+                <input class="field" id="invoice" placeholder="rgb:…/…utxob:…" />
+                <button data-call="sendInvoice">sendAsset({ invoice })</button>
+              </div>
+            </div>
+            <div>
+              <label>transfers</label>
+              <div class="row">
+                <input class="field" id="transfer_id" placeholder="idx, utxob:… or txid" />
+                <button class="ghost" data-call="getTransferStatus">getTransferStatus()</button>
+                <button class="ghost" data-call="listTransfers">listTransfers()</button>
+              </div>
+            </div>
+            <div class="row">
+              <button data-call="subscribe">on(transferReceived, transferSettled)</button>
+              <button class="ghost" data-call="unsubscribe">off()</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>RGB over Lightning</h2>
+          <p class="note">
+            Only when <code>getInfo().protocol === "RGB_LN"</code>. A node-less RGB wallet rejects
+            both with <code>METHOD_NOT_SUPPORTED</code>.
+          </p>
+          <div class="stack">
+            <div>
+              <label>makeLnInvoice — asset amount (blank = any) · sats carried (blank = wallet floor)</label>
+              <div class="row">
+                <input class="field" id="ln_asset_amt" type="number" placeholder="1" style="max-width: 110px" />
+                <input class="field" id="ln_sats" type="number" placeholder="3000" style="max-width: 110px" />
+                <button data-call="makeLnInvoice">makeLnInvoice()</button>
+              </div>
+            </div>
+            <div>
+              <label>payLnInvoice — an RGB Lightning invoice from another wallet</label>
+              <div class="row">
+                <input class="field" id="ln_invoice" placeholder="lnbc…" />
+                <button data-call="payLnInvoice">payLnInvoice()</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section>
+        <h2>Log <button class="ghost" id="clear" style="float: right; padding: 2px 8px">clear</button></h2>
+        <div id="log"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { requestProvider } from "./webrgb.js";
+
+      const $ = (id) => document.getElementById(id);
+      const logEl = $("log");
+      const bigintSafe = (_k, v) => (typeof v === "bigint" ? v.toString() : v);
+
+      function log(label, data, kind = "info") {
+        const e = document.createElement("div");
+        e.className = `entry ${kind}`;
+        const t = document.createElement("span");
+        t.className = "t";
+        t.textContent = new Date().toLocaleTimeString() + " ";
+        const l = document.createElement("span");
+        l.className = "label";
+        l.textContent = label;
+        e.append(t, l);
+        if (data !== undefined) {
+          const body = document.createElement("span");
+          body.textContent =
+            "\n" + (typeof data === "string" ? data : JSON.stringify(data, bigintSafe, 2));
+          e.append(body);
+        }
+        logEl.prepend(e);
+      }
+      $("clear").onclick = () => logEl.replaceChildren();
+
+      function setPresence(on) {
+        $("pill").classList.toggle("on", on);
+      }
+      setPresence(typeof window.rgb !== "undefined");
+      window.addEventListener("rgb:ready", (e) => {
+        setPresence(true);
+        log("rgb:ready", e.detail, "evt");
+      });
+
+      let rgb = null;
+      async function provider() {
+        if (rgb) return rgb;
+        rgb = await requestProvider({ timeoutMs: 2000 });
+        setPresence(true);
+        return rgb;
+      }
+
+      async function run(label, fn) {
+        log(label, undefined, "call");
+        try {
+          const res = await fn();
+          log(label + " →", res === undefined ? "ok" : res, "ok");
+          return res;
+        } catch (err) {
+          log(label + " ✗", { message: err?.message, code: err?.code }, "err");
+          return undefined;
+        }
+      }
+
+      const num = (id) => Number($(id).value || 0) || undefined;
+      const str = (id) => $(id).value.trim();
+      const onReceived = (t) => log("event transferReceived", t, "evt");
+      const onSettled = (t) => log("event transferSettled", t, "evt");
+
+      const actions = {
+        requestProvider: () =>
+          run("requestProvider()", async () => {
+            rgb = null;
+            const p = await provider();
+            return { enabled: p.enabled, methods: Object.keys(Object.getOwnPropertyDescriptors(p)) };
+          }),
+        enable: () => run("enable()", async () => (await provider()).enable()),
+        getInfo: () => run("getInfo()", async () => (await provider()).getInfo()),
+        getAddress: () => run("getAddress()", async () => (await provider()).getAddress()),
+        listAssets: async () => {
+          const assets = await run("listAssets()", async () => (await provider()).listAssets());
+          const first = Array.isArray(assets) ? assets[0] : undefined;
+          const id = first?.asset_id ?? first?.id ?? first?.assetId;
+          if (id && !str("asset")) $("asset").value = id;
+        },
+        getAssetBalance: () =>
+          run("getAssetBalance()", async () => (await provider()).getAssetBalance(str("asset"))),
+        issueAsset: async () => {
+          const r = await run("issueAsset()", async () =>
+            (await provider()).issueAsset({
+              schema: "nia",
+              ticker: str("ticker").toUpperCase(),
+              name: str("name"),
+              amounts: [Number($("supply").value || 1)],
+              precision: 0,
+            }),
+          );
+          if (r?.assetId) $("asset").value = r.assetId;
+        },
+        blindReceive: () =>
+          run("blindReceive()", async () =>
+            (await provider()).blindReceive({ assetId: str("asset"), amount: num("recv_amt") }),
+          ),
+        sendInvoice: () =>
+          run("sendAsset({ invoice })", async () =>
+            (await provider()).sendAsset({ invoice: str("invoice") }),
+          ),
+        getTransferStatus: () =>
+          run("getTransferStatus()", async () =>
+            (await provider()).getTransferStatus(str("transfer_id"), str("asset") || undefined),
+          ),
+        listTransfers: () =>
+          run("listTransfers()", async () => (await provider()).listTransfers(str("asset") || undefined)),
+        subscribe: () =>
+          run("on(...)", async () => {
+            const p = await provider();
+            p.on("transferReceived", onReceived);
+            p.on("transferSettled", onSettled);
+          }),
+        unsubscribe: () =>
+          run("off(...)", async () => {
+            const p = await provider();
+            p.off("transferReceived", onReceived);
+            p.off("transferSettled", onSettled);
+          }),
+        makeLnInvoice: () =>
+          run("makeLnInvoice()", async () =>
+            (await provider()).makeLnInvoice({
+              assetId: str("asset"),
+              assetAmount: num("ln_asset_amt"),
+              amountSats: num("ln_sats"),
+            }),
+          ),
+        payLnInvoice: () =>
+          run("payLnInvoice()", async () => (await provider()).payLnInvoice({ invoice: str("ln_invoice") })),
+      };
+
+      document.querySelectorAll("button[data-call]").forEach((b) => {
+        b.addEventListener("click", () => actions[b.dataset.call]());
+      });
+
+      log("ready", "Module loaded from ./webrgb.js. Press requestProvider() to find the wallet.");
+    </script>
+  </body>
+</html>

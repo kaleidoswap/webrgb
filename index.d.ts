@@ -1,17 +1,17 @@
 /**
- * Type declarations for the wallet providers the KaleidoSwap browser
- * extension injects into web pages.
+ * WebRGB — the `window.rgb` provider a wallet injects into web pages so a
+ * dApp can issue, receive, send and track RGB assets, and pay or receive them
+ * over Lightning, without running its own RGB backend.
  *
- * Source of truth is the extension's `src/injected.ts`; this file mirrors it.
- * `window.webln` follows the WebLN spec and is typed by `@webbtc/webln-types`
- * (install it alongside this package); the other four surfaces are declared
- * here.
+ * The reference implementation is the KaleidoSwap browser extension
+ * (`src/injected.ts`); this file mirrors it. `window.webln`, `window.webbtc`
+ * and `window.nostr` are separate specs with their own typings.
  *
- * Every provider rejects with a {@link ProviderError} whose `code` tells a
- * user's refusal apart from a wallet fault.
+ * Every call rejects with a {@link ProviderError} whose `code` tells a user's
+ * refusal apart from a wallet fault.
  */
 
-/** Error codes shared by every injected provider. */
+/** Error codes the provider rejects with. */
 export type ProviderErrorCode =
   | "USER_REJECTED"
   | "NOT_ENABLED"
@@ -21,8 +21,6 @@ export type ProviderErrorCode =
 export interface ProviderError extends Error {
   code: ProviderErrorCode;
 }
-
-export type ProviderEventListener = (payload: unknown) => void;
 
 // ---------------------------------------------------------------------------
 // window.rgb
@@ -178,121 +176,29 @@ export interface RgbProvider {
 }
 
 // ---------------------------------------------------------------------------
-// window.webbtc
+// Discovery
 // ---------------------------------------------------------------------------
 
-export interface WebBtcInfo {
-  network?: string;
-  methods: string[];
-  [key: string]: unknown;
+export interface RequestProviderOptions {
+  /** How long to wait for `rgb:ready` before rejecting. Default 3000 ms. */
+  timeoutMs?: number;
 }
 
-export interface WebBtcProvider {
-  readonly enabled: boolean;
-  enable(): Promise<void>;
-  getInfo(): Promise<WebBtcInfo>;
-  getAddress(opts?: { protocol?: string }): Promise<{ address: string; [key: string]: unknown }>;
-  signPsbt(psbtHex: string): Promise<{ signed: string; [key: string]: unknown }>;
-  finalizePsbt(psbtHex: string): Promise<{ hex: string; [key: string]: unknown }>;
-  broadcastTransaction(txHex: string): Promise<{ txid: string; [key: string]: unknown }>;
-  /** BIP-322 message signature. */
-  signMessage(
-    message: string,
-    address?: string,
-  ): Promise<{ signature: string; address?: string; [key: string]: unknown }>;
-  /** A single BIP-21 or BOLT-11 payment request string. */
-  sendPayment(paymentRequest: string): Promise<unknown>;
-  sendTransaction(address: string, amount: number): Promise<{ txid: string; [key: string]: unknown }>;
-  on(event: string, listener: ProviderEventListener): void;
-  off(event: string, listener: ProviderEventListener): void;
-}
-
-// ---------------------------------------------------------------------------
-// window.bitcoin  (Bitcoin Wallet Standard, Unisat/OKX/Leather-style)
-// ---------------------------------------------------------------------------
-
-export interface BitcoinWalletProvider {
-  readonly enabled: boolean;
-  connect(): Promise<string[]>;
-  requestAccounts(): Promise<string[]>;
-  disconnect(): Promise<void>;
-  getAccounts(): Promise<string[]>;
-  getPublicKey(): Promise<string>;
-  signMessage(message: string, type?: "ecdsa" | "bip322-simple"): Promise<string>;
-  signPsbt(psbtHex: string, options?: Record<string, unknown>): Promise<string>;
-  pushPsbt(psbtHex: string): Promise<string>;
-  sendBitcoin(toAddress: string, satoshis: number, options?: Record<string, unknown>): Promise<string>;
-  on(event: string, listener: ProviderEventListener): void;
-  off(event: string, listener: ProviderEventListener): void;
-  removeListener(event: string, listener: ProviderEventListener): void;
-}
-
-// ---------------------------------------------------------------------------
-// window.nostr  (NIP-07)
-// ---------------------------------------------------------------------------
-
-export interface NostrUnsignedEvent {
-  kind: number;
-  created_at: number;
-  tags: string[][];
-  content: string;
-  pubkey?: string;
-}
-
-export interface NostrSignedEvent extends NostrUnsignedEvent {
-  id: string;
-  pubkey: string;
-  sig: string;
-}
-
-export interface NostrRelayPolicy {
-  read: boolean;
-  write: boolean;
-}
-
-export interface NostrCipher {
-  encrypt(pubkey: string, plaintext: string): Promise<string>;
-  decrypt(pubkey: string, ciphertext: string): Promise<string>;
-}
-
-export interface NostrProvider {
-  getPublicKey(): Promise<string>;
-  signEvent(event: NostrUnsignedEvent): Promise<NostrSignedEvent>;
-  getRelays(): Promise<Record<string, NostrRelayPolicy>>;
-  /** Extension-specific: Schnorr-sign a 32-byte hex digest. */
-  signSchnorr(sigHash: string): Promise<string>;
-  /** Extension-specific: SHA-256 the message, then Schnorr-sign the digest. */
-  hashAndSignSchnorr(message: string): Promise<string>;
-  nip04: NostrCipher;
-  nip44: NostrCipher;
-}
-
-// ---------------------------------------------------------------------------
-// Ready events
-// ---------------------------------------------------------------------------
-
-/** Dispatched on `window` once the providers are installed. */
-export type ProviderReadyEvent =
-  | "webln:ready"
-  | "weblnReady"
-  | "webbtc:ready"
-  | "webbtcReady"
-  | "bitcoin:ready"
-  | "nostr:ready"
-  | "rgb:ready";
+/**
+ * Resolve `window.rgb`, waiting for the wallet's `rgb:ready` event if the
+ * page ran before the provider was installed. Rejects with a
+ * {@link ProviderError} (`METHOD_NOT_SUPPORTED`) when no provider appears
+ * within the timeout.
+ */
+export function requestProvider(options?: RequestProviderOptions): Promise<RgbProvider>;
 
 declare global {
   interface Window {
     rgb?: RgbProvider;
-    webbtc?: WebBtcProvider;
-    bitcoin?: BitcoinWalletProvider;
-    nostr?: NostrProvider;
   }
 
   interface WindowEventMap {
+    /** Dispatched once `window.rgb` is installed. */
     "rgb:ready": CustomEvent<{ version: string }>;
-    "webbtc:ready": CustomEvent<{ version: string }>;
-    "bitcoin:ready": CustomEvent<{ version: string }>;
-    "nostr:ready": CustomEvent<{ version: string }>;
   }
 }

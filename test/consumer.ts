@@ -1,6 +1,7 @@
 // Compile-only consumer: the declarations must let a dApp be written against
 // every injected provider without casts, and must reject misuse.
-import type { ProviderError, RgbTransfer } from "@kaleidorg/wallet-provider-types";
+import { requestProvider } from "@kaleidorg/webrgb";
+import type { ProviderError, RgbTransfer } from "@kaleidorg/webrgb";
 
 async function useRgb(): Promise<void> {
   if (!window.rgb) return;
@@ -31,32 +32,11 @@ async function useRgb(): Promise<void> {
   await window.rgb.sendAsset({ assetId: "rgb:x" });
 }
 
-async function useOthers(): Promise<void> {
-  if (window.webln) {
-    await window.webln.enable();
-    const { paymentRequest } = await window.webln.makeInvoice({ amount: 21, defaultMemo: "hi" });
-    await window.webln.sendPayment(paymentRequest);
-  }
-  if (window.webbtc) {
-    const { address } = await window.webbtc.getAddress();
-    await window.webbtc.signMessage("hello", address);
-  }
-  if (window.bitcoin) {
-    const [account] = await window.bitcoin.connect();
-    account.toUpperCase();
-    await window.bitcoin.signMessage("hello", "bip322-simple");
-  }
-  if (window.nostr) {
-    const pubkey = await window.nostr.getPublicKey();
-    const signed = await window.nostr.signEvent({
-      kind: 1,
-      created_at: 0,
-      tags: [],
-      content: "gm",
-    });
-    signed.sig.length;
-    await window.nostr.nip44.encrypt(pubkey, "secret");
-  }
+async function useDiscovery(): Promise<void> {
+  const rgb = await requestProvider({ timeoutMs: 5000 });
+  await rgb.enable();
+  const rgbDefault = await requestProvider();
+  rgbDefault.enabled;
 }
 
 window.addEventListener("rgb:ready", (e) => {
@@ -68,5 +48,5 @@ function isUserRejected(err: unknown): boolean {
 }
 
 void useRgb;
-void useOthers;
+void useDiscovery;
 void isUserRejected;

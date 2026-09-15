@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/kaleidoswap/webrgb"
   },
-  "homepage": "https://docs.kaleidoswap.com/extensions/kaleidoswap-extension/dapp-connectivity",
+  "homepage": "https://github.com/kaleidoswap/webrgb#readme",
   "keywords": [
     "webrgb",
     "rgb",
@@ -23,7 +23,8 @@
     "index.js",
     "index.d.ts",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
   "scripts": {
@@ -42,5 +43,11 @@
       "types": "./index.d.ts",
       "default": "./index.js"
     }
+  },
+  "bugs": {
+    "url": "https://github.com/kaleidoswap/webrgb/issues"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

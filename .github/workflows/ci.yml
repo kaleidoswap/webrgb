@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Type-check (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      # The package is declarations plus one ESM file; the "test" is tsc over
+      # both, with test/consumer.ts pinning what a dApp can and cannot write.
+      - name: Test
+        run: npm test
+
+      # Prove the published artifact is what the README promises: pack it,
+      # install the tarball into a bare project and import it in plain Node.
+      - name: Verify package imports (bare Node)
+        run: |
+          set -euo pipefail
+          TGZ="$(npm pack --silent | tail -1)"
+          WORK="$(mktemp -d)"
+          mv "$TGZ" "$WORK/"
+          cd "$WORK"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund "./$TGZ"
+          node --input-type=module -e "
+            const m = await import('@kaleidorg/webrgb');
+            if (typeof m.requestProvider !== 'function') throw new Error('requestProvider missing');
+            await m.requestProvider().then(
+              () => { throw new Error('resolved outside a browser'); },
+              (err) => { if (err.code !== 'METHOD_NOT_SUPPORTED') throw err; },
+            );
+            console.log('OK: imports in bare Node and refuses politely without a window');
+          "
+          test -f node_modules/@kaleidorg/webrgb/index.d.ts
+
+      - name: Audit dependencies (high+)
+        run: npm audit --audit-level=high

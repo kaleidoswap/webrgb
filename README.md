@@ -2,11 +2,11 @@
 
 **WebRGB** is the `window.rgb` provider a wallet injects into web pages so a dApp can issue, receive, send and track [RGB](https://rgb.tech) assets, and pay or receive them over Lightning, without running its own RGB backend. It sits next to [WebLN](https://www.webln.dev/) (`window.webln`) and WebBTC (`window.webbtc`) and follows the same conventions: one `enable()` consent per origin, a confirmation in the wallet for every funds-touching call, and errors that carry a `code`.
 
-The reference implementation is the [KaleidoSwap browser extension](https://docs.kaleidoswap.com/extensions/kaleidoswap-extension/dapp-connectivity). This package ships the TypeScript declarations and a small `requestProvider()` helper.
+[`SPEC.md`](./SPEC.md) is the interface contract. The reference implementation is the [KaleidoSwap browser extension](https://docs.kaleidoswap.com/extensions/kaleidoswap-extension/dapp-connectivity) from 0.3.0 on. This package ships the TypeScript declarations, discovery, an in-memory mock wallet and a conformance suite.
 
 ## Try it
 
-The [playground](https://kaleidoswap.github.io/webrgb/) imports this module and exercises every `window.rgb` method against the wallet you have installed, with a live log of calls, results and error codes. Use a signet or regtest wallet.
+The [playground](https://kaleidoswap.github.io/webrgb/) imports this module and exercises every `window.rgb` method, with a live log of calls, results and error codes. Drive it against the extension with a signet or regtest wallet — or press **install mock wallet** and use it with nothing installed at all.
 
 ## Install
 
@@ -19,26 +19,26 @@ Importing anything from the package augments `Window`, so `window.rgb` is typed 
 ## Usage
 
 ```ts
-import { requestProvider, type ProviderError } from "@kaleidorg/webrgb";
+import { requestProvider, isProviderError, supports, toAssetArray } from "@kaleidorg/webrgb";
 
 try {
-  // Waits for the wallet's `rgb:ready` event if the page ran first.
-  const rgb = await requestProvider();
-  await rgb.enable();
+  // Waits for the wallet if the page ran first; `enable` connects the origin.
+  const rgb = await requestProvider({ enable: true });
 
   const info = await rgb.getInfo();
   // { ready, network, protocol: "RGB_L1" | "RGB_LN", methods: [...] }
 
-  const { invoice } = await rgb.blindReceive({ assetId: "rgb:…", amount: 1 });
+  const assets = toAssetArray(await rgb.listAssets());
+  const { invoice } = await rgb.blindReceive({ assetId: assets[0].id!, amount: 1 });
 
-  if (info.protocol === "RGB_LN") {
-    const ln = await rgb.makeLnInvoice({ assetId: "rgb:…", assetAmount: 5 });
+  if (supports(info, "makeLnInvoice")) {
+    const ln = await rgb.makeLnInvoice({ assetId: assets[0].id!, assetAmount: 5 });
     console.log("pay me over Lightning:", ln.invoice);
   }
 
   rgb.on("transferSettled", (t) => console.log("settled", t.transferId));
 } catch (err) {
-  if ((err as ProviderError).code === "USER_REJECTED") return; // the user said no
+  if (isProviderError(err) && err.code === "USER_REJECTED") return; // the user said no
   throw err;
 }
 ```
@@ -57,7 +57,62 @@ try {
 | `makeLnInvoice(args)` / `payLnInvoice(args)` | RGB over Lightning; listed in `methods` only when the wallet has a Lightning node |
 | `on` / `off` | `transferReceived` and `transferSettled` events |
 
-Feature-detect with `getInfo().methods` rather than assuming a method exists: a node-less wallet rejects the Lightning methods with `METHOD_NOT_SUPPORTED`.
+Feature-detect with `supports(info, method)` rather than assuming a method exists: a node-less wallet rejects the Lightning methods with `METHOD_NOT_SUPPORTED`.
+
+`listAssets()` and `listTransfers()` are typed wide because wallets differ on whether they wrap the array — pass them through `toAssetArray()` / `toTransferArray()`.
+
+## Discovery
+
+`window.rgb` is a single slot, so two installed wallets cannot both own it. Wallets also announce themselves, EIP-6963 style, and `listProviders()` collects the answers:
+
+```ts
+import { listProviders } from "@kaleidorg/webrgb";
+
+for (const { info, provider } of await listProviders()) {
+  console.log(info.name, info.rdns); // show a picker, then use `provider`
+}
+```
+
+`requestProvider()` resolves whichever comes first — an installed `window.rgb`, an announcement, or the legacy `rgb:ready` event — so a dApp that wants one wallet needs nothing else.
+
+Wallet side, one call joins discovery:
+
+```ts
+import { announceProvider } from "@kaleidorg/webrgb";
+
+announceProvider({
+  info: { uuid: crypto.randomUUID(), name: "Example", rdns: "com.example.wallet" },
+  provider,
+});
+```
+
+## Building without a wallet
+
+`@kaleidorg/webrgb/mock` is an in-memory provider that enforces the same rules a real one does — `NOT_ENABLED` before `enable()`, `METHOD_NOT_SUPPORTED` for anything absent from `getInfo().methods`, a confirmation step you can make refuse:
+
+```ts
+import { createMockProvider, installMockProvider } from "@kaleidorg/webrgb/mock";
+
+// In a test:
+const rgb = createMockProvider({ protocol: "RGB_LN", assets: [{ id: "rgb:x", balance: 100 }] });
+await rgb.enable();
+const sent = await rgb.sendAsset({ assetId: "rgb:x", amount: 1, recipientId: "utxob:y" });
+rgb.settle(sent.transferId!); // fires transferSettled
+expect(rgb.calls.map((c) => c.method)).toContain("sendAsset");
+
+// In a dev build: put it on window.rgb and let the app find it as usual.
+const { uninstall } = installMockProvider();
+```
+
+## Conformance
+
+`@kaleidorg/webrgb/conformance` checks a live wallet against `SPEC.md` using read-only calls only, so it raises no confirmation:
+
+```ts
+import { runConformance, formatReport } from "@kaleidorg/webrgb/conformance";
+
+console.log(formatReport(await runConformance(window.rgb!)));
+```
 
 ## Errors
 
@@ -68,15 +123,18 @@ Feature-detect with `getInfo().methods` rather than assuming a method exists: a 
 | `METHOD_NOT_SUPPORTED` | The connected wallet cannot serve this method, or no provider was found |
 | `INTERNAL_ERROR` | Anything else; see `error.message` |
 
+The error crosses a `postMessage` boundary on its way out of the wallet, so what you catch is a plain `Error` carrying `code` — `instanceof` will not help. Use `isProviderError(err)`, or `providerErrorCode(err)` for a `switch` that must be total.
+
 ## Versioning
 
-The declarations mirror the extension's `src/injected.ts`. A method added to the provider lands here as a minor bump; a changed signature as a major bump. If the two disagree, trust the wallet and open an issue.
+The declarations mirror `SPEC.md` and the extension's `src/injected.ts`. A method added to the provider lands here as a minor bump; a changed signature as a major bump. If the two disagree, trust the wallet and open an issue.
 
 ## Development
 
 ```bash
 npm install
-npm test   # type-checks index.js and compiles test/consumer.ts against the declarations
+npm test           # tsc over the declarations and index.js, plus the runtime tests
+npm run test:package   # are-the-types-wrong + publint against the packed tarball
 ```
 
 ## License

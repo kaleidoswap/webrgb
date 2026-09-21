@@ -23,10 +23,20 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
-      # The package is declarations plus one ESM file; the "test" is tsc over
-      # both, with test/consumer.ts pinning what a dApp can and cannot write.
-      - name: Test
-        run: npm test
+      # Declarations plus three ESM files. tsc covers both halves — under a
+      # bundler and under NodeNext, which is what resolves the "exports" map —
+      # with test/consumer.ts pinning what a dApp can and cannot write; the
+      # runtime tests cover what a .d.ts cannot prove.
+      - name: Type-check
+        run: npm run test:types
+
+      - name: Runtime tests
+        run: npm run test:runtime
+
+      # Catches an "exports" map or declaration that resolves wrongly for some
+      # consumer — the classic bug in a types-first package.
+      - name: Check the packed package (attw + publint)
+        run: npm run test:package
 
       # Prove the published artifact is what the README promises: pack it,
       # install the tarball into a bare project and import it in plain Node.
@@ -46,9 +56,15 @@ jobs:
               () => { throw new Error('resolved outside a browser'); },
               (err) => { if (err.code !== 'METHOD_NOT_SUPPORTED') throw err; },
             );
-            console.log('OK: imports in bare Node and refuses politely without a window');
+            const { createMockProvider } = await import('@kaleidorg/webrgb/mock');
+            const { runConformance } = await import('@kaleidorg/webrgb/conformance');
+            const report = await runConformance(createMockProvider());
+            if (!report.ok) throw new Error('the mock is not conformant: ' + JSON.stringify(report));
+            console.log('OK: every subpath imports in bare Node and refuses politely without a window');
           "
-          test -f node_modules/@kaleidorg/webrgb/index.d.ts
+          for f in index.d.ts mock.d.ts conformance.d.ts SPEC.md; do
+            test -f "node_modules/@kaleidorg/webrgb/$f"
+          done
 
       - name: Audit dependencies (high+)
         run: npm audit --audit-level=high

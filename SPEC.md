@@ -1,0 +1,166 @@
+# The WebRGB provider interface
+
+**Status:** draft, version 1. The interface is implemented by the KaleidoSwap
+browser extension ≥ 0.3.0 and described by `index.d.ts` in this repository.
+
+A **wallet** injects a provider into a web page. A **dApp** calls it to issue,
+receive, send and track [RGB](https://rgb.tech) assets, and to pay or receive
+them over Lightning, without running an RGB backend of its own. WebRGB sits
+next to WebLN (`window.webln`) and WebBTC (`window.webbtc`) and follows their
+conventions.
+
+"MUST", "SHOULD" and "MAY" are used as in RFC 2119.
+
+## 1. Installing a provider
+
+A wallet MUST expose the provider object as `window.rgb` and MUST dispatch a
+`rgb:ready` `CustomEvent` on `window` once it is installed:
+
+```js
+window.rgb = provider;
+window.dispatchEvent(new CustomEvent("rgb:ready", { detail: { version: "1.0.0" } }));
+```
+
+A page may run before or after the wallet, so a dApp MUST handle both orders —
+`requestProvider()` in this package does.
+
+`window.rgb` is a single slot. A wallet SHOULD NOT overwrite a provider another
+wallet installed; it MUST still announce itself (§2) so the page can choose.
+
+## 2. Discovery
+
+`window.rgb` cannot represent two installed wallets. Discovery works like
+EIP-6963: pages ask, wallets answer.
+
+- A page asks by dispatching an `Event` named **`rgb:requestProvider`** on
+  `window`.
+- A wallet answers, and also announces once on load, by dispatching a
+  `CustomEvent` named **`rgb:announceProvider`** whose `detail` is
+  `{ info, provider }`.
+
+```ts
+interface RgbProviderInfo {
+  uuid: string; // UUIDv4, fresh per page load — identifies the announcement
+  name: string; // "KaleidoSwap"
+  rdns: string; // "com.kaleidoswap.extension" — stable, identifies the wallet
+  icon?: string; // data: URI
+}
+```
+
+A wallet MUST keep answering `rgb:requestProvider` for the lifetime of the
+page, MUST use a reverse-DNS `rdns` it controls, and MUST announce the same
+object it installed at `window.rgb` when it installed one. A page MUST
+deduplicate by `rdns`.
+
+Discovery is additive: a wallet that only sets `window.rgb` still works, and a
+page that only reads `window.rgb` still works.
+
+## 3. Connection and consent
+
+`enable()` asks the user to connect the origin. Every other method MUST reject
+with `NOT_ENABLED` until it has resolved. A wallet MAY share one approval
+across its RGB, WebLN and WebBTC providers. `enable()` MUST be idempotent and
+MUST NOT prompt again for an origin already connected.
+
+Beyond the connection, consent is per call:
+
+| Method | Prompts | Notes |
+|--------|---------|-------|
+| `getInfo`, `getAddress`, `listAssets`, `getAssetBalance`, `listTransfers`, `getTransferStatus`, `decodeRgbInvoice` | MUST NOT | Read-only; a page may poll them |
+| `blindReceive` | MUST | Creates an invoice that binds a UTXO |
+| `issueAsset` | MUST | Mints; MAY also require a separate wallet capability |
+| `sendAsset` | MUST | Moves assets |
+| `makeLnInvoice`, `payLnInvoice` | MUST | Moves, or commits to receiving, assets over Lightning |
+
+A prompt the user dismisses MUST reject with `USER_REJECTED`.
+
+## 4. Methods
+
+Signatures are in [`index.d.ts`](./index.d.ts); this section is the contract
+around them.
+
+- **`getInfo()`** returns `{ ready, network, protocol, methods }`. `ready` is
+  `false` when no RGB wallet is connected — every other call then rejects.
+  `protocol` is `"RGB_L1"` (node-less, client-side RGB), `"RGB_LN"` (an RGB
+  Lightning node), or `null` when nothing is connected.
+- **`methods`** is the feature-detection contract. It MUST list exactly the
+  methods the wallet will serve. A method absent from it MUST reject with
+  `METHOD_NOT_SUPPORTED`; a method present in it MUST NOT. `makeLnInvoice` and
+  `payLnInvoice` MUST appear only when `protocol` is `"RGB_LN"`, and
+  `issueAsset` only when the runtime can mint.
+- **`getAddress()`** returns a Bitcoin address of the wallet that anchors its
+  RGB state. It is not an RGB invoice.
+- **`blindReceive({ assetId, amount?, … })`** returns an RGB invoice against a
+  blinded UTXO. Omitting `amount` means any amount.
+- **`issueAsset({ schema, ticker, name, amounts, precision? })`** mints.
+  `schema` is `"nia"`, `"uda"` or `"cfa"`; a wallet that cannot serve a schema
+  MUST reject with `METHOD_NOT_SUPPORTED` rather than substituting another.
+- **`sendAsset(args)`** takes either `{ invoice }` (preferred) or the explicit
+  `{ assetId, amount, recipientId }`. It returns at least the wallet's handle
+  on the transfer — `txid` and/or `transferId` — so the page can track it.
+- **`listAssets()`** and **`listTransfers(assetId?)`** MUST return arrays.
+  (Wallets that wrap them exist; `toAssetArray` / `toTransferArray` in this
+  package tolerate that, and the conformance suite reports it.)
+- **`getTransferStatus(transferId, assetId?)`** MUST resolve
+  `{ found: false, status: null, transfer: null }` for an unknown transfer
+  rather than rejecting. `transferId` MAY be matched against the wallet's own
+  id, the recipient id, or the txid.
+- **`decodeRgbInvoice(invoice)`** reads what an invoice asks for, so a page can
+  show it before calling `sendAsset`. It MUST NOT prompt and MUST NOT move
+  anything. `amount` MUST be the same number the wallet's own confirmation
+  would show, and `null` for an any-amount invoice rather than `0`.
+- **`makeLnInvoice(args)`** returns a BOLT-11 invoice carrying the asset. The
+  node enforces a minimum HTLC value, so the wallet MAY raise `amountSats`; the
+  confirmation MUST show the figure actually encoded.
+- **`payLnInvoice(invoice)`** pays a BOLT-11 invoice that carries an asset. A
+  plain Bitcoin invoice SHOULD be refused — that is `webln.sendPayment()`.
+
+## 5. Events
+
+`on(event, listener)` / `off(event, listener)` deliver:
+
+| Event | Fires when |
+|-------|-----------|
+| `transferReceived` | The wallet sees an incoming transfer for this wallet |
+| `transferSettled` | A known transfer reaches `Settled` |
+
+The listener receives the transfer. A wallet SHOULD start whatever polling
+backs this only while a page holds a listener, and SHOULD deliver events only
+to origins that have called `enable()`.
+
+## 6. Errors
+
+Every rejection MUST be an `Error` carrying a `code`:
+
+| Code | Meaning |
+|------|---------|
+| `USER_REJECTED` | The user declined the connection or a confirmation |
+| `NOT_ENABLED` | Called before `enable()` resolved for this origin |
+| `METHOD_NOT_SUPPORTED` | This wallet cannot serve this method |
+| `INTERNAL_ERROR` | Anything else; `message` carries the detail |
+
+A dApp MUST NOT rely on `instanceof`: the error crosses a `postMessage`
+boundary and arrives as a plain `Error`. Use `isProviderError()`.
+
+A wallet MUST NOT leak wallet state through error messages to an origin that
+has not been enabled.
+
+## 7. Conformance
+
+`@kaleidorg/webrgb/conformance` runs the read-only half of this document
+against a live provider:
+
+```js
+import { runConformance, formatReport } from "@kaleidorg/webrgb/conformance";
+console.log(formatReport(await runConformance(window.rgb)));
+```
+
+It never issues, sends or creates an invoice, so it raises no confirmation and
+costs nothing to run against a funded wallet.
+
+## 8. Changes
+
+This document and `index.d.ts` version together. A method added to the
+interface is a minor version of the package; a changed signature is a major
+one. Where a wallet and this document disagree, the wallet is what pages see —
+[open an issue](https://github.com/kaleidoswap/webrgb/issues).

@@ -12,6 +12,10 @@ on:
       - 'site/**'
       - 'index.js'
       - 'index.d.ts'
+      - 'mock.js'
+      - 'mock.d.ts'
+      - 'conformance.js'
+      - 'conformance.d.ts'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -39,8 +43,8 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp site/index.html _site/
-          cp index.js _site/webrgb.js
-          cp index.d.ts _site/webrgb.d.ts
+          cp index.js mock.js conformance.js _site/
+          cp index.d.ts mock.d.ts conformance.d.ts _site/
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5

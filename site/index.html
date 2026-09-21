@@ -139,6 +139,24 @@
         </section>
 
         <section>
+          <h2>Discovery &amp; conformance</h2>
+          <p class="note">
+            <code>listProviders()</code> asks every installed wallet to announce itself, so a page
+            can offer a picker instead of racing for the single <code>window.rgb</code> slot.
+            <code>runConformance()</code> checks this wallet against
+            <a href="https://github.com/kaleidoswap/webrgb/blob/main/SPEC.md">SPEC.md</a> using
+            read-only calls only — it raises no confirmation. No wallet installed? Install the
+            in-memory mock and the whole page works without one.
+          </p>
+          <div class="row">
+            <button data-call="listProviders">listProviders()</button>
+            <button data-call="conformance">runConformance()</button>
+            <button class="ghost" data-call="mockOn">install mock wallet</button>
+            <button class="ghost" data-call="mockOff">remove mock</button>
+          </div>
+        </section>
+
+        <section>
           <h2>Assets</h2>
           <div class="stack">
             <div class="row">
@@ -172,6 +190,7 @@
               <label>sendAsset — receiver's RGB invoice</label>
               <div class="row">
                 <input class="field" id="invoice" placeholder="rgb:…/…utxob:…" />
+                <button class="ghost" data-call="decodeRgbInvoice">decodeRgbInvoice()</button>
                 <button data-call="sendInvoice">sendAsset({ invoice })</button>
               </div>
             </div>
@@ -223,7 +242,9 @@
     </main>
 
     <script type="module">
-      import { requestProvider } from "./webrgb.js";
+      import { listProviders, requestProvider, toAssetArray } from "./index.js";
+      import { installMockProvider } from "./mock.js";
+      import { formatReport, runConformance } from "./conformance.js";
 
       const $ = (id) => document.getElementById(id);
       const logEl = $("log");
@@ -259,6 +280,7 @@
       });
 
       let rgb = null;
+      let mock = null;
       async function provider() {
         if (rgb) return rgb;
         rgb = await requestProvider({ timeoutMs: 2000 });
@@ -291,11 +313,39 @@
             return { enabled: p.enabled, methods: Object.keys(Object.getOwnPropertyDescriptors(p)) };
           }),
         enable: () => run("enable()", async () => (await provider()).enable()),
+        listProviders: () =>
+          run("listProviders()", async () =>
+            (await listProviders({ timeoutMs: 400 })).map((d) => d.info),
+          ),
+        decodeRgbInvoice: () =>
+          run("decodeRgbInvoice()", async () => (await provider()).decodeRgbInvoice(str("invoice"))),
+        conformance: () =>
+          run("runConformance()", async () => formatReport(await runConformance(await provider()))),
+        mockOn: () =>
+          run("installMockProvider()", async () => {
+            if (mock) return "already installed";
+            mock = installMockProvider({
+              protocol: "RGB_LN",
+              assets: [{ id: "rgb:mock-demo", ticker: "DEMO", name: "Demo asset", balance: 1000 }],
+            });
+            rgb = null;
+            setPresence(true);
+            return mock.info;
+          }),
+        mockOff: () =>
+          run("mock.uninstall()", async () => {
+            if (!mock) return "no mock installed";
+            mock.uninstall();
+            mock = null;
+            rgb = null;
+            setPresence(typeof window.rgb !== "undefined");
+            return "removed";
+          }),
         getInfo: () => run("getInfo()", async () => (await provider()).getInfo()),
         getAddress: () => run("getAddress()", async () => (await provider()).getAddress()),
         listAssets: async () => {
           const assets = await run("listAssets()", async () => (await provider()).listAssets());
-          const first = Array.isArray(assets) ? assets[0] : undefined;
+          const first = toAssetArray(assets)[0];
           const id = first?.asset_id ?? first?.id ?? first?.assetId;
           if (id && !str("asset")) $("asset").value = id;
         },
@@ -355,7 +405,10 @@
         b.addEventListener("click", () => actions[b.dataset.call]());
       });
 
-      log("ready", "Module loaded from ./webrgb.js. Press requestProvider() to find the wallet.");
+      log(
+        "ready",
+        "Module loaded from ./index.js. Press requestProvider() to find a wallet, or install the mock.",
+      );
     </script>
   </body>
 </html>

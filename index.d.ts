@@ -3,9 +3,10 @@
  * dApp can issue, receive, send and track RGB assets, and pay or receive them
  * over Lightning, without running its own RGB backend.
  *
- * The reference implementation is the KaleidoSwap browser extension
- * (`src/injected.ts`); this file mirrors it. `window.webln`, `window.webbtc`
- * and `window.nostr` are separate specs with their own typings.
+ * `SPEC.md` in this repository is the interface contract; the reference
+ * implementation is the KaleidoSwap browser extension (`src/injected.ts`).
+ * `window.webln`, `window.webbtc` and `window.nostr` are separate specs with
+ * their own typings.
  *
  * Every call rejects with a {@link ProviderError} whose `code` tells a user's
  * refusal apart from a wallet fault.
@@ -18,9 +19,27 @@ export type ProviderErrorCode =
   | "METHOD_NOT_SUPPORTED"
   | "INTERNAL_ERROR";
 
+/** Every code, in the order the README documents them. */
+export declare const RGB_ERROR_CODES: readonly ProviderErrorCode[];
+
+/**
+ * The shape of a rejection. The error crosses `postMessage` on its way out of
+ * the wallet, so what a page catches is a plain `Error` carrying `code` — not
+ * an instance of any class this package exports. Use {@link isProviderError}
+ * rather than `instanceof`.
+ */
 export interface ProviderError extends Error {
   code: ProviderErrorCode;
 }
+
+/** `true` when `value` is an error carrying a WebRGB `code`. */
+export declare function isProviderError(value: unknown): value is ProviderError;
+
+/**
+ * The code of any thrown value, for a `switch` that must be total.
+ * Anything without a recognised `code` reads as `"INTERNAL_ERROR"`.
+ */
+export declare function providerErrorCode(value: unknown): ProviderErrorCode;
 
 // ---------------------------------------------------------------------------
 // window.rgb
@@ -36,18 +55,43 @@ export type RgbTransferStatus =
   | "Failed"
   | (string & {});
 
+/**
+ * Names as they appear in `getInfo().methods`. The union is open: a wallet may
+ * serve methods this version does not know about.
+ */
+export type RgbMethod =
+  | "enable"
+  | "getInfo"
+  | "getAddress"
+  | "blindReceive"
+  | "issueAsset"
+  | "listAssets"
+  | "getAssetBalance"
+  | "sendAsset"
+  | "listTransfers"
+  | "getTransferStatus"
+  | "decodeRgbInvoice"
+  | "makeLnInvoice"
+  | "payLnInvoice"
+  | "on"
+  | "off"
+  | (string & {});
+
 export interface RgbInfo {
   /** `false` when no RGB wallet is connected; other calls will then reject. */
   ready: boolean;
   network: string;
-  protocol: RgbProtocol | null;
+  protocol: RgbProtocol | (string & {}) | null;
   /**
    * Methods the connected wallet can serve. `issueAsset` appears only when the
    * runtime can mint; `makeLnInvoice` / `payLnInvoice` only when `protocol` is
-   * `"RGB_LN"`.
+   * `"RGB_LN"`. Test it with {@link supports} rather than assuming.
    */
-  methods: string[];
+  methods: RgbMethod[];
 }
+
+/** `true` when `info.methods` lists `method`. */
+export declare function supports(info: Pick<RgbInfo, "methods">, method: RgbMethod): boolean;
 
 export interface RgbBlindReceiveArgs {
   assetId: string;
@@ -79,6 +123,29 @@ export interface RgbIssueAssetResult {
   asset: Record<string, unknown>;
 }
 
+/**
+ * One asset the wallet holds. Wallets carry more fields than these; the named
+ * ones are what a conforming wallet always provides.
+ */
+export interface RgbAsset {
+  /** Asset id (`rgb:…`). Some wallets spell it `asset_id`. */
+  id?: string;
+  asset_id?: string;
+  ticker?: string;
+  name?: string;
+  precision?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * A conforming wallet returns a plain array. Older builds wrap it, so the type
+ * stays wide — pass the result through {@link toAssetArray}.
+ */
+export type RgbAssetList = RgbAsset[] | { assets?: RgbAsset[]; [key: string]: unknown };
+
+/** Narrow any shape a wallet returns from `listAssets()` to an array. */
+export declare function toAssetArray(result: unknown): RgbAsset[];
+
 export interface RgbAssetBalance {
   assetId: string;
   balance: number;
@@ -99,6 +166,17 @@ export type RgbSendAssetArgs =
       transportEndpoints?: string[];
     };
 
+/** What a wallet reports once it has broadcast a send. Fields are best-effort. */
+export interface RgbSendAssetResult {
+  txid?: string;
+  transferId?: string | number;
+  status?: RgbTransferStatus;
+  assetId?: string;
+  amount?: number;
+  recipientId?: string;
+  [key: string]: unknown;
+}
+
 export interface RgbTransfer {
   assetId?: string;
   transferId?: string | number;
@@ -108,6 +186,33 @@ export interface RgbTransfer {
   recipientId?: string;
   txid?: string;
   [key: string]: unknown;
+}
+
+/**
+ * A conforming wallet returns a plain array. Older builds pass the node's own
+ * envelope through — use {@link toTransferArray}.
+ */
+export type RgbTransferList =
+  | RgbTransfer[]
+  | { transfers?: RgbTransfer[]; [key: string]: unknown };
+
+/** Narrow any shape a wallet returns from `listTransfers()` to an array. */
+export declare function toTransferArray(result: unknown): RgbTransfer[];
+
+/** What an RGB invoice asks for, as the wallet reads it. */
+export interface RgbDecodedInvoice {
+  assetId?: string;
+  /**
+   * Units the invoice moves, or `null` for an any-amount invoice — which a
+   * wallet may refuse to pay unattended, since nothing fixes what leaves it.
+   */
+  amount: number | null;
+  recipientId?: string;
+  expirationTimestamp?: number;
+  network?: string;
+  transportEndpoints?: string[];
+  /** The wallet's own decode, unmapped. */
+  raw?: Record<string, unknown>;
 }
 
 export interface RgbTransferStatusResult {
@@ -159,14 +264,19 @@ export interface RgbProvider {
   getAddress(): Promise<{ address: string }>;
   blindReceive(args: RgbBlindReceiveArgs): Promise<RgbBlindReceiveResult>;
   issueAsset(args: RgbIssueAssetArgs): Promise<RgbIssueAssetResult>;
-  listAssets(): Promise<unknown[]>;
+  listAssets(): Promise<RgbAssetList>;
   getAssetBalance(assetId: string): Promise<RgbAssetBalance>;
-  sendAsset(args: RgbSendAssetArgs): Promise<unknown>;
-  listTransfers(assetId?: string): Promise<unknown>;
+  sendAsset(args: RgbSendAssetArgs): Promise<RgbSendAssetResult>;
+  listTransfers(assetId?: string): Promise<RgbTransferList>;
   getTransferStatus(
     transferId: string | number,
     assetId?: string,
   ): Promise<RgbTransferStatusResult>;
+  /**
+   * Read what an invoice asks for before paying it. Read-only: it raises no
+   * confirmation. Served only by wallets that list it in `getInfo().methods`.
+   */
+  decodeRgbInvoice(args: { invoice: string } | string): Promise<RgbDecodedInvoice>;
   /** RGB over Lightning; `RGB_LN` wallets only. */
   makeLnInvoice(args: RgbMakeLnInvoiceArgs): Promise<RgbMakeLnInvoiceResult>;
   /** Pay a BOLT-11 invoice that carries an asset; `RGB_LN` wallets only. */
@@ -179,18 +289,75 @@ export interface RgbProvider {
 // Discovery
 // ---------------------------------------------------------------------------
 
+/** How a wallet identifies itself when it announces a provider. */
+export interface RgbProviderInfo {
+  /** Fresh per page load (UUIDv4); identifies this announcement, not the wallet. */
+  uuid: string;
+  /** Human name, e.g. `"KaleidoSwap"`. */
+  name: string;
+  /** Reverse-DNS wallet id, e.g. `"com.kaleidoswap.extension"`. Stable across loads. */
+  rdns: string;
+  /** Optional `data:` URI icon. */
+  icon?: string;
+}
+
+export interface RgbProviderDetail {
+  info: RgbProviderInfo;
+  provider: RgbProvider;
+}
+
 export interface RequestProviderOptions {
-  /** How long to wait for `rgb:ready` before rejecting. Default 3000 ms. */
+  /**
+   * How long to wait for a provider before rejecting. Default 3000 ms;
+   * `0` rejects at once when none is already installed.
+   */
   timeoutMs?: number;
+  /** Call `enable()` before resolving, so one `await` yields a usable provider. */
+  enable?: boolean;
 }
 
 /**
- * Resolve `window.rgb`, waiting for the wallet's `rgb:ready` event if the
- * page ran before the provider was installed. Rejects with a
- * {@link ProviderError} (`METHOD_NOT_SUPPORTED`) when no provider appears
- * within the timeout.
+ * Resolve a provider: `window.rgb` if the wallet installed it already,
+ * otherwise the first one to answer discovery (`rgb:announceProvider`) or to
+ * fire the legacy `rgb:ready`. Rejects with a {@link ProviderError}
+ * (`METHOD_NOT_SUPPORTED`) when none appears within the timeout.
  */
-export function requestProvider(options?: RequestProviderOptions): Promise<RgbProvider>;
+export declare function requestProvider(options?: RequestProviderOptions): Promise<RgbProvider>;
+
+export interface ListProvidersOptions {
+  /** How long to collect announcements. Default 500 ms. */
+  timeoutMs?: number;
+  /**
+   * Include `window.rgb` as a synthetic detail when it is installed but its
+   * wallet never announced. Default `true`.
+   */
+  includeLegacy?: boolean;
+}
+
+/**
+ * Ask every installed wallet to announce itself and collect the answers,
+ * deduplicated by `rdns`. Use this to offer a picker when more than one RGB
+ * wallet may be present; `window.rgb` is a single slot and only one wallet
+ * can own it.
+ */
+export declare function listProviders(
+  options?: ListProvidersOptions,
+): Promise<RgbProviderDetail[]>;
+
+/**
+ * Listen for wallets announcing themselves, and ask those already loaded to
+ * announce now. Returns an unsubscribe function.
+ */
+export declare function onProviderAnnounced(
+  listener: (detail: RgbProviderDetail) => void,
+): () => void;
+
+/**
+ * Announce a provider — the wallet side of discovery. Dispatches
+ * `rgb:announceProvider` now and on every later `rgb:requestProvider`, and
+ * returns a function that stops answering.
+ */
+export declare function announceProvider(detail: RgbProviderDetail): () => void;
 
 declare global {
   interface Window {
@@ -200,5 +367,9 @@ declare global {
   interface WindowEventMap {
     /** Dispatched once `window.rgb` is installed. */
     "rgb:ready": CustomEvent<{ version: string }>;
+    /** A wallet offering a provider, in answer to `rgb:requestProvider` or on load. */
+    "rgb:announceProvider": CustomEvent<RgbProviderDetail>;
+    /** A page asking every wallet to announce. */
+    "rgb:requestProvider": Event;
   }
 }

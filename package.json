@@ -1,11 +1,11 @@
 {
   "name": "@kaleidorg/webrgb",
-  "version": "0.1.0",
-  "description": "WebRGB: TypeScript declarations and a requestProvider() helper for the window.rgb provider injected by the KaleidoSwap browser extension.",
+  "version": "0.2.0",
+  "description": "WebRGB: TypeScript declarations, discovery, a mock wallet and a conformance suite for the window.rgb provider injected by RGB wallets such as the KaleidoSwap extension.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kaleidoswap/webrgb"
+    "url": "git+https://github.com/kaleidoswap/webrgb.git"
   },
   "homepage": "https://github.com/kaleidoswap/webrgb#readme",
   "keywords": [
@@ -22,15 +22,25 @@
   "files": [
     "index.js",
     "index.d.ts",
+    "mock.js",
+    "mock.d.ts",
+    "conformance.js",
+    "conformance.d.ts",
     "README.md",
+    "SPEC.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
   "sideEffects": false,
   "scripts": {
-    "test": "tsc -p test/tsconfig.json"
+    "test": "npm run test:types && npm run test:runtime",
+    "test:types": "tsc -p test/tsconfig.json && tsc -p test/nodenext/tsconfig.json",
+    "test:runtime": "node --test test/*.test.js",
+    "test:package": "attw --pack . --profile esm-only && publint"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
+    "publint": "^0.3.14",
     "typescript": "^5.6.0"
   },
   "publishConfig": {
@@ -42,7 +52,16 @@
     ".": {
       "types": "./index.d.ts",
       "default": "./index.js"
-    }
+    },
+    "./mock": {
+      "types": "./mock.d.ts",
+      "default": "./mock.js"
+    },
+    "./conformance": {
+      "types": "./conformance.d.ts",
+      "default": "./conformance.js"
+    },
+    "./package.json": "./package.json"
   },
   "bugs": {
     "url": "https://github.com/kaleidoswap/webrgb/issues"

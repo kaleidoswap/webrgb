@@ -334,6 +334,19 @@ describe("mock provider", () => {
     assert.equal(settled.length, 1);
   });
 
+  it("decodes its own invoices and refuses rubbish", async () => {
+    const rgb = createMockProvider({ assets: [{ id: "rgb:a", balance: 5 }] });
+    await rgb.enable();
+    const { invoice } = await rgb.blindReceive({ assetId: "rgb:a", amount: 2 });
+    const decoded = await rgb.decodeRgbInvoice(invoice);
+    assert.equal(decoded.assetId, "rgb:a");
+    assert.match(String(decoded.recipientId), /^utxob:/);
+    await assert.rejects(rgb.decodeRgbInvoice("not-an-invoice"), (err) => {
+      assert.equal(providerErrorCode(err), "INTERNAL_ERROR");
+      return true;
+    });
+  });
+
   it("rejects an unimplemented schema and an unknown asset", async () => {
     const rgb = createMockProvider();
     await rgb.enable();
@@ -428,6 +441,23 @@ describe("conformance", () => {
     const guard = report.checks.find((c) => c.name === "not-enabled-guard");
     assert.equal(guard?.status, "fail");
     assert.equal(report.ok, false);
+  });
+
+  it("checks decoding only when the wallet serves it", async () => {
+    const serving = await runConformance(createMockProvider());
+    assert.equal(
+      serving.checks.find((c) => c.name === "decode-rejects-rubbish")?.status,
+      "pass",
+      formatReport(serving),
+    );
+
+    const notServing = createMockProvider({
+      methods: ["enable", "getInfo", "getAddress", "listAssets", "getAssetBalance",
+        "listTransfers", "getTransferStatus", "on", "off"],
+    });
+    const report = await runConformance(notServing);
+    assert.equal(report.checks.find((c) => c.name === "decode-rejects-rubbish")?.status, "skip");
+    assert.equal(report.ok, true, formatReport(report));
   });
 
   it("catches a wallet that wraps its lists", async () => {

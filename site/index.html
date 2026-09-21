@@ -190,6 +190,7 @@
               <label>sendAsset — receiver's RGB invoice</label>
               <div class="row">
                 <input class="field" id="invoice" placeholder="rgb:…/…utxob:…" />
+                <button class="ghost" data-call="decodeRgbInvoice">decodeRgbInvoice()</button>
                 <button data-call="sendInvoice">sendAsset({ invoice })</button>
               </div>
             </div>
@@ -316,6 +317,8 @@
           run("listProviders()", async () =>
             (await listProviders({ timeoutMs: 400 })).map((d) => d.info),
           ),
+        decodeRgbInvoice: () =>
+          run("decodeRgbInvoice()", async () => (await provider()).decodeRgbInvoice(str("invoice"))),
         conformance: () =>
           run("runConformance()", async () => formatReport(await runConformance(await provider()))),
         mockOn: () =>

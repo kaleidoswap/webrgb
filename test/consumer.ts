@@ -41,6 +41,13 @@ async function useRgb(): Promise<void> {
   const transfers: RgbTransfer[] = toTransferArray(await window.rgb.listTransfers());
   transfers.map((t) => t.status);
 
+  // Read what an invoice asks for before sending against it.
+  if (supports(info, "decodeRgbInvoice")) {
+    const decoded = await window.rgb.decodeRgbInvoice(invoice);
+    if (decoded.amount === null) return; // an any-amount invoice
+    decoded.amount.toFixed(0);
+  }
+
   // Feature detection is typed, and autocompletes the known names.
   if (supports(info, "makeLnInvoice") && info.protocol === "RGB_LN") {
     const ln = await window.rgb.makeLnInvoice({ assetId: "rgb:x", assetAmount: 5 });

@@ -212,6 +212,24 @@ export async function runConformance(provider, options = {}) {
     return "the wallet answered for an unknown asset instead of rejecting";
   });
 
+  // Decoding is read-only, so a wallet that serves it must refuse rubbish
+  // with a code rather than throwing something uncoded at the page.
+  await check("decode-rejects-rubbish", async () => {
+    const seen = info;
+    if (!seen || !supports(seen, "decodeRgbInvoice")) return "the wallet does not decode invoices";
+    try {
+      await provider.decodeRgbInvoice("not-an-rgb-invoice");
+    } catch (err) {
+      assert(err instanceof Error, "a rejection was not an Error");
+      assert(
+        typeof (/** @type {{ code?: unknown }} */ (err).code) === "string",
+        "a rejection carried no code",
+      );
+      return;
+    }
+    return "the wallet decoded a malformed invoice instead of rejecting";
+  });
+
   await check("events-register", () => {
     /** @param {import("./index.js").RgbTransfer} _transfer */
     const listener = (_transfer) => {};

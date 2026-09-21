@@ -30,6 +30,9 @@ The KaleidoSwap extension 0.3.0 is the first release that injects
 - `supports(info, method)` and the `RgbMethod` union for typed feature
   detection; `toAssetArray()` / `toTransferArray()` for wallets that wrap their
   lists.
+- `decodeRgbInvoice(invoice)`: read what an invoice asks for before sending
+  against it — read-only, no confirmation, `amount: null` for an any-amount
+  invoice. Served by the extension from 0.3.1.
 - `requestProvider({ enable: true })`, and `timeoutMs: 0` for "do not wait".
 - Runtime tests (`node --test`), a NodeNext type-check of the published
   `exports` map, and `attw` + `publint` over the packed tarball.

@@ -15,6 +15,7 @@ const BASE_METHODS = [
   "sendAsset",
   "listTransfers",
   "getTransferStatus",
+  "decodeRgbInvoice",
   "on",
   "off",
 ];
@@ -221,6 +222,21 @@ export function createMockProvider(options = {}) {
       return match
         ? { found: true, status: match.status ?? null, transfer: { ...match } }
         : { found: false, status: null, transfer: null };
+    },
+
+    /** @param {{ invoice: string } | string} args */
+    async decodeRgbInvoice(args) {
+      const invoice = typeof args === "string" ? args : args?.invoice;
+      await call("decodeRgbInvoice", [args]);
+      if (!invoice) throw fail("An invoice is required", "INTERNAL_ERROR");
+      const assetId = parseAssetId(invoice);
+      const amount = /\/(\d+)\+utxob:/.exec(invoice);
+      return {
+        assetId,
+        amount: amount ? Number(amount[1]) : null,
+        recipientId: parseRecipientId(invoice),
+        network: network,
+      };
     },
 
     /** @param {import("./index.js").RgbMakeLnInvoiceArgs} args */

@@ -54,6 +54,7 @@ try {
 | `listAssets()` / `getAssetBalance(id)` | Holdings |
 | `sendAsset(args)` | Send against an RGB invoice, or explicitly |
 | `listTransfers(id?)` / `getTransferStatus(id)` | Transfer history and status |
+| `decodeRgbInvoice(invoice)` | What an invoice asks for, before you pay it — read-only, no prompt |
 | `makeLnInvoice(args)` / `payLnInvoice(args)` | RGB over Lightning; listed in `methods` only when the wallet has a Lightning node |
 | `on` / `off` | `transferReceived` and `transferSettled` events |
 

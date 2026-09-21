@@ -66,7 +66,7 @@ Beyond the connection, consent is per call:
 
 | Method | Prompts | Notes |
 |--------|---------|-------|
-| `getInfo`, `getAddress`, `listAssets`, `getAssetBalance`, `listTransfers`, `getTransferStatus` | MUST NOT | Read-only; a page may poll them |
+| `getInfo`, `getAddress`, `listAssets`, `getAssetBalance`, `listTransfers`, `getTransferStatus`, `decodeRgbInvoice` | MUST NOT | Read-only; a page may poll them |
 | `blindReceive` | MUST | Creates an invoice that binds a UTXO |
 | `issueAsset` | MUST | Mints; MAY also require a separate wallet capability |
 | `sendAsset` | MUST | Moves assets |
@@ -105,6 +105,10 @@ around them.
   `{ found: false, status: null, transfer: null }` for an unknown transfer
   rather than rejecting. `transferId` MAY be matched against the wallet's own
   id, the recipient id, or the txid.
+- **`decodeRgbInvoice(invoice)`** reads what an invoice asks for, so a page can
+  show it before calling `sendAsset`. It MUST NOT prompt and MUST NOT move
+  anything. `amount` MUST be the same number the wallet's own confirmation
+  would show, and `null` for an any-amount invoice rather than `0`.
 - **`makeLnInvoice(args)`** returns a BOLT-11 invoice carrying the asset. The
   node enforces a minimum HTLC value, so the wallet MAY raise `amountSats`; the
   confirmation MUST show the figure actually encoded.

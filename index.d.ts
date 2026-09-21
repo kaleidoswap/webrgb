@@ -70,6 +70,7 @@ export type RgbMethod =
   | "sendAsset"
   | "listTransfers"
   | "getTransferStatus"
+  | "decodeRgbInvoice"
   | "makeLnInvoice"
   | "payLnInvoice"
   | "on"
@@ -198,6 +199,22 @@ export type RgbTransferList =
 /** Narrow any shape a wallet returns from `listTransfers()` to an array. */
 export declare function toTransferArray(result: unknown): RgbTransfer[];
 
+/** What an RGB invoice asks for, as the wallet reads it. */
+export interface RgbDecodedInvoice {
+  assetId?: string;
+  /**
+   * Units the invoice moves, or `null` for an any-amount invoice — which a
+   * wallet may refuse to pay unattended, since nothing fixes what leaves it.
+   */
+  amount: number | null;
+  recipientId?: string;
+  expirationTimestamp?: number;
+  network?: string;
+  transportEndpoints?: string[];
+  /** The wallet's own decode, unmapped. */
+  raw?: Record<string, unknown>;
+}
+
 export interface RgbTransferStatusResult {
   found: boolean;
   status: RgbTransferStatus | null;
@@ -255,6 +272,11 @@ export interface RgbProvider {
     transferId: string | number,
     assetId?: string,
   ): Promise<RgbTransferStatusResult>;
+  /**
+   * Read what an invoice asks for before paying it. Read-only: it raises no
+   * confirmation. Served only by wallets that list it in `getInfo().methods`.
+   */
+  decodeRgbInvoice(args: { invoice: string } | string): Promise<RgbDecodedInvoice>;
   /** RGB over Lightning; `RGB_LN` wallets only. */
   makeLnInvoice(args: RgbMakeLnInvoiceArgs): Promise<RgbMakeLnInvoiceResult>;
   /** Pay a BOLT-11 invoice that carries an asset; `RGB_LN` wallets only. */

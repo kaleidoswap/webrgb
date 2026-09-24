@@ -12,8 +12,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
   that accepts any asset, which is the only way to receive an asset the wallet
   has never held ([#2](https://github.com/kaleidoswap/webrgb/issues/2)).
 - `RgbBlindReceiveResult.minConfirmations`: the confirmations the wallet will
-  actually wait for. A wallet may raise a lower request to its reorg floor, and
-  now says so.
+  actually wait for. SPEC.md recommends at least 3: reorgs are not handled, and
+  a reorged-out transfer loses the received assets. A wallet raises a lower
+  request to its floor, and now says so.
 - Error codes `INVALID_PARAMS` (a malformed or out-of-range argument, rejected
   before any prompt) and `ASSET_NOT_FOUND` (an asset the wallet does not know).
   An unknown asset id used to be indistinguishable from a malformed one.

@@ -105,7 +105,10 @@ export interface RgbBlindReceiveArgs {
   /** Omit for an any-amount invoice. */
   amount?: number;
   durationSeconds?: number;
-  /** The wallet MAY raise this to its own floor; the result carries the value used. */
+  /**
+   * Raised to the wallet's floor — at least 3, since RGB reorgs are not handled
+   * and would lose the assets. The result carries the value used.
+   */
   minConfirmations?: number;
 }
 

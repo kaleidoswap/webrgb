@@ -96,9 +96,11 @@ around them.
   the only way to receive an asset the wallet has never held, since a wallet
   can only name a contract it already knows. An `assetId` the wallet does not
   know MUST reject with `ASSET_NOT_FOUND`, not `INTERNAL_ERROR`.
-  A wallet MAY enforce a floor on `minConfirmations` — a transfer with fewer
-  confirmations can still be reorged out — and SHOULD raise a lower request to
-  it rather than reject. The confirmation MUST show the value actually used,
+  A wallet SHOULD NOT accept fewer than 3 confirmations for `minConfirmations`:
+  RGB wallets do not handle reorgs today, so a transfer accepted as settled
+  whose anchoring transaction is later reorged out loses the received assets.
+  A wallet MAY enforce a higher floor, and SHOULD raise a lower request to its
+  floor rather than reject. The confirmation MUST show the value actually used,
   and the result MUST carry it as `minConfirmations`.
 - **`issueAsset({ schema, ticker, name, amounts, precision? })`** mints.
   `schema` is `"nia"`, `"uda"` or `"cfa"`; a wallet that cannot serve a schema

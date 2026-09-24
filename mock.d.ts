@@ -31,6 +31,11 @@ export interface MockProviderOptions {
   assets?: Array<RgbAsset & { balance?: number }>;
   /** Delay every call by this many milliseconds, to shake out missing awaits. */
   latencyMs?: number;
+  /**
+   * The fewest confirmations `blindReceive` will accept; a lower request is
+   * raised to it. Default `1`. The KaleidoSwap extension uses `3`.
+   */
+  minConfirmationsFloor?: number;
 }
 
 export interface MockCall {

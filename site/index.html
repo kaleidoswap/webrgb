@@ -180,7 +180,7 @@
           <h2>On-chain transfers</h2>
           <div class="stack">
             <div>
-              <label>blindReceive — amount (blank = any)</label>
+              <label>blindReceive — amount (blank = any); blank asset = any asset</label>
               <div class="row">
                 <input class="field" id="recv_amt" type="number" placeholder="1" style="max-width: 110px" />
                 <button data-call="blindReceive">blindReceive()</button>
@@ -365,7 +365,8 @@
         },
         blindReceive: () =>
           run("blindReceive()", async () =>
-            (await provider()).blindReceive({ assetId: str("asset"), amount: num("recv_amt") }),
+            // An empty asset field asks for an invoice that accepts any asset.
+            (await provider()).blindReceive({ assetId: str("asset") || undefined, amount: num("recv_amt") }),
           ),
         sendInvoice: () =>
           run("sendAsset({ invoice })", async () =>

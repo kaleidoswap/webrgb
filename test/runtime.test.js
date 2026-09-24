@@ -237,6 +237,8 @@ describe("helpers", () => {
       "USER_REJECTED",
       "NOT_ENABLED",
       "METHOD_NOT_SUPPORTED",
+      "INVALID_PARAMS",
+      "ASSET_NOT_FOUND",
       "INTERNAL_ERROR",
     ]);
     assert.throws(() => RGB_ERROR_CODES.push("NEW"));
@@ -342,7 +344,7 @@ describe("mock provider", () => {
     assert.equal(decoded.assetId, "rgb:a");
     assert.match(String(decoded.recipientId), /^utxob:/);
     await assert.rejects(rgb.decodeRgbInvoice("not-an-invoice"), (err) => {
-      assert.equal(providerErrorCode(err), "INTERNAL_ERROR");
+      assert.equal(providerErrorCode(err), "INVALID_PARAMS");
       return true;
     });
   });
@@ -358,9 +360,39 @@ describe("mock provider", () => {
       },
     );
     await assert.rejects(rgb.getAssetBalance("rgb:nope"), (err) => {
-      assert.equal(providerErrorCode(err), "INTERNAL_ERROR");
+      assert.equal(providerErrorCode(err), "ASSET_NOT_FOUND");
       return true;
     });
+  });
+
+  it("receives an asset it has never held through an any-asset invoice", async () => {
+    const rgb = createMockProvider();
+    await rgb.enable();
+    await assert.rejects(rgb.blindReceive({ assetId: "rgb:new" }), (err) => {
+      assert.equal(providerErrorCode(err), "ASSET_NOT_FOUND");
+      return true;
+    });
+    await assert.rejects(rgb.blindReceive({ assetId: "not-an-id" }), (err) => {
+      assert.equal(providerErrorCode(err), "INVALID_PARAMS");
+      return true;
+    });
+
+    const { invoice } = await rgb.blindReceive();
+    const decoded = await rgb.decodeRgbInvoice(invoice);
+    assert.equal(decoded.assetId, undefined);
+    assert.match(String(decoded.recipientId), /^utxob:/);
+    // Nothing in the invoice says which asset leaves, so only the explicit form pays it.
+    await assert.rejects(rgb.sendAsset({ invoice }), (err) => {
+      assert.equal(providerErrorCode(err), "INVALID_PARAMS");
+      return true;
+    });
+  });
+
+  it("reports the confirmations it will wait for, raised to its floor", async () => {
+    const rgb = createMockProvider({ minConfirmationsFloor: 3, assets: [{ id: "rgb:a" }] });
+    await rgb.enable();
+    assert.equal((await rgb.blindReceive({ assetId: "rgb:a", minConfirmations: 1 })).minConfirmations, 3);
+    assert.equal((await rgb.blindReceive({ minConfirmations: 6 })).minConfirmations, 6);
   });
 
   it("refuses confirmations when told to, and records every call", async () => {

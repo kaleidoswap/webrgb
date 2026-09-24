@@ -43,6 +43,7 @@ export function createMockProvider(options = {}) {
   const ready = options.ready ?? true;
   const autoEnable = options.autoEnable ?? true;
   const latencyMs = options.latencyMs ?? 0;
+  const minConfirmationsFloor = options.minConfirmationsFloor ?? 1;
   const methods =
     options.methods ?? (protocol === "RGB_LN" ? [...BASE_METHODS, ...LN_METHODS] : BASE_METHODS);
 
@@ -83,10 +84,13 @@ export function createMockProvider(options = {}) {
     if (options.rejectConfirmations) throw fail("User rejected the request", "USER_REJECTED");
   }
 
-  /** @param {string} assetId */
+  /** @param {unknown} assetId */
   function requireAsset(assetId) {
+    if (typeof assetId !== "string" || !assetId.startsWith("rgb:")) {
+      throw fail(`Invalid assetId: ${String(assetId)}`, "INVALID_PARAMS");
+    }
     const held = assets.get(assetId);
-    if (!held) throw fail(`Unknown asset ${assetId}`, "INTERNAL_ERROR");
+    if (!held) throw fail(`Unknown asset ${assetId}`, "ASSET_NOT_FOUND");
     return held;
   }
 
@@ -125,16 +129,19 @@ export function createMockProvider(options = {}) {
       return { address: `bcrt1qmock${String(nextId()).padStart(6, "0")}` };
     },
 
-    /** @param {import("./index.js").RgbBlindReceiveArgs} args */
-    async blindReceive(args) {
+    /** @param {import("./index.js").RgbBlindReceiveArgs} [args] */
+    async blindReceive(args = {}) {
       await call("blindReceive", [args]);
+      // Arguments are checked before the prompt, as a wallet does.
+      if (args.assetId !== undefined) requireAsset(args.assetId);
       confirm();
-      requireAsset(args.assetId);
       const recipientId = `utxob:mock${nextId()}`;
       return {
-        invoice: `${args.assetId}/RGB20/${recipientId}`,
+        // An any-asset invoice leaves the contract out, like rgb-lib's `rgb:~/…`.
+        invoice: `${args.assetId ?? "rgb:~"}/RGB20/${recipientId}`,
         recipientId,
         expirationTimestamp: Math.floor(Date.now() / 1000) + (args.durationSeconds ?? 86400),
+        minConfirmations: Math.max(args.minConfirmations ?? 1, minConfirmationsFloor),
       };
     },
 
@@ -181,6 +188,12 @@ export function createMockProvider(options = {}) {
       confirm();
       const byInvoice = "invoice" in args;
       const assetId = byInvoice ? parseAssetId(args.invoice) : args.assetId;
+      if (assetId === undefined) {
+        throw fail(
+          "The invoice accepts any asset; send with { assetId, amount, recipientId }",
+          "INVALID_PARAMS",
+        );
+      }
       const amount = byInvoice ? 0 : args.amount;
       const held = requireAsset(assetId);
       if (!byInvoice && held.balance < amount) {
@@ -228,7 +241,7 @@ export function createMockProvider(options = {}) {
     async decodeRgbInvoice(args) {
       const invoice = typeof args === "string" ? args : args?.invoice;
       await call("decodeRgbInvoice", [args]);
-      if (!invoice) throw fail("An invoice is required", "INTERNAL_ERROR");
+      if (!invoice) throw fail("An invoice is required", "INVALID_PARAMS");
       const assetId = parseAssetId(invoice);
       const amount = /\/(\d+)\+utxob:/.exec(invoice);
       return {
@@ -309,11 +322,14 @@ export function createMockProvider(options = {}) {
   );
 }
 
-/** @param {string} invoice */
+/**
+ * `undefined` for an invoice that accepts any asset (`rgb:~/…`).
+ * @param {string} invoice
+ */
 function parseAssetId(invoice) {
   const match = /rgb:([^/]+)/.exec(invoice);
-  if (!match) throw fail("Not an RGB invoice", "INTERNAL_ERROR");
-  return `rgb:${match[1]}`;
+  if (!match) throw fail("Not an RGB invoice", "INVALID_PARAMS");
+  return match[1] === "~" ? undefined : `rgb:${match[1]}`;
 }
 
 /** @param {string} invoice */

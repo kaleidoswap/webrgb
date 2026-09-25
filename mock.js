@@ -246,7 +246,8 @@ export function createMockProvider(options = {}) {
       const amount = /\/(\d+)\+utxob:/.exec(invoice);
       return {
         assetId,
-        amount: amount ? Number(amount[1]) : null,
+        // A fungible 0 is an any-amount invoice, not a request for zero.
+        amount: amount && Number(amount[1]) > 0 ? Number(amount[1]) : null,
         recipientId: parseRecipientId(invoice),
         network: network,
       };

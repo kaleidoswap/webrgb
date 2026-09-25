@@ -216,8 +216,9 @@ export declare function toTransferArray(result: unknown): RgbTransfer[];
 export interface RgbDecodedInvoice {
   assetId?: string;
   /**
-   * Units the invoice moves, or `null` for an any-amount invoice — which a
-   * wallet may refuse to pay unattended, since nothing fixes what leaves it.
+   * Units the invoice moves, or `null` for an any-amount invoice — including
+   * one whose fungible assignment is `0`. A wallet may refuse to pay one
+   * unattended, since nothing fixes what leaves it.
    */
   amount: number | null;
   recipientId?: string;

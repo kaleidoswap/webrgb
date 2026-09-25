@@ -388,6 +388,14 @@ describe("mock provider", () => {
     });
   });
 
+  it("decodes a fungible-zero invoice as any-amount", async () => {
+    const rgb = createMockProvider();
+    await rgb.enable();
+    const decoded = await rgb.decodeRgbInvoice("rgb:a/RGB20/0+utxob:zero");
+    assert.equal(decoded.amount, null);
+    assert.equal((await rgb.decodeRgbInvoice("rgb:a/RGB20/5+utxob:five")).amount, 5);
+  });
+
   it("reports the confirmations it will wait for, raised to its floor", async () => {
     const rgb = createMockProvider({ minConfirmationsFloor: 3, assets: [{ id: "rgb:a" }] });
     await rgb.enable();

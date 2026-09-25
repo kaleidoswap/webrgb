@@ -19,6 +19,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
   before any prompt) and `ASSET_NOT_FOUND` (an asset the wallet does not know).
   An unknown asset id used to be indistinguishable from a malformed one.
 - `createMockProvider({ minConfirmationsFloor })`.
+- SPEC.md: a fungible assignment of `0` is an any-amount invoice, read the
+  same way as `Assignment::Any`. Refusing `sendAsset({ invoice })` for an
+  any-amount invoice uses `INVALID_PARAMS`
+  ([#4](https://github.com/kaleidoswap/webrgb/issues/4)).
 
 ### Changed
 

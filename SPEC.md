@@ -108,6 +108,9 @@ around them.
 - **`sendAsset(args)`** takes either `{ invoice }` (preferred) or the explicit
   `{ assetId, amount, recipientId }`. It returns at least the wallet's handle
   on the transfer — `txid` and/or `transferId` — so the page can track it.
+  A wallet MAY refuse `{ invoice }` for an any-amount invoice, since nothing
+  in the request fixes what leaves the wallet; it MUST then reject with
+  `INVALID_PARAMS`, and the explicit form is how a page pays one.
 - **`listAssets()`** and **`listTransfers(assetId?)`** MUST return arrays.
   (Wallets that wrap them exist; `toAssetArray` / `toTransferArray` in this
   package tolerate that, and the conformance suite reports it.)
@@ -119,6 +122,11 @@ around them.
   show it before calling `sendAsset`. It MUST NOT prompt and MUST NOT move
   anything. `amount` MUST be the same number the wallet's own confirmation
   would show, and `null` for an any-amount invoice rather than `0`.
+  An invoice whose fungible assignment is `0` is an any-amount invoice: rgb-lib
+  writes an unconstrained invoice both as `Assignment::Any` and as
+  `Assignment::Fungible(0)`, and a wallet MUST read the two the same way —
+  `amount: null` here, and the amount the user or the page supplies on send —
+  never as a request for zero. Issuers SHOULD prefer `Any`, which says so.
 - **`makeLnInvoice(args)`** returns a BOLT-11 invoice carrying the asset. The
   node enforces a minimum HTLC value, so the wallet MAY raise `amountSats`; the
   confirmation MUST show the figure actually encoded.

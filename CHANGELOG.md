@@ -6,6 +6,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-26
+
+Resolves [#2](https://github.com/kaleidoswap/webrgb/issues/2) and
+[#4](https://github.com/kaleidoswap/webrgb/issues/4). The KaleidoSwap
+extension serves the new behaviour from its first release after 0.3.0;
+extension 0.3.0 itself still requires `assetId` and predates the new codes.
+
 ### Added
 
 - `blindReceive()` takes an optional `assetId`. Omitting it asks for an invoice

@@ -6,6 +6,39 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-26
+
+Resolves [#2](https://github.com/kaleidoswap/webrgb/issues/2) and
+[#4](https://github.com/kaleidoswap/webrgb/issues/4). The KaleidoSwap
+extension serves the new behaviour from its first release after 0.3.0;
+extension 0.3.0 itself still requires `assetId` and predates the new codes.
+
+### Added
+
+- `blindReceive()` takes an optional `assetId`. Omitting it asks for an invoice
+  that accepts any asset, which is the only way to receive an asset the wallet
+  has never held ([#2](https://github.com/kaleidoswap/webrgb/issues/2)).
+- `RgbBlindReceiveResult.minConfirmations`: the confirmations the wallet will
+  actually wait for. SPEC.md recommends at least 3: reorgs are not handled, and
+  a reorged-out transfer loses the received assets. A wallet raises a lower
+  request to its floor, and now says so.
+- Error codes `INVALID_PARAMS` (a malformed or out-of-range argument, rejected
+  before any prompt) and `ASSET_NOT_FOUND` (an asset the wallet does not know).
+  An unknown asset id used to be indistinguishable from a malformed one.
+- `createMockProvider({ minConfirmationsFloor })`.
+- SPEC.md: a fungible assignment of `0` is an any-amount invoice, read the
+  same way as `Assignment::Any`. Refusing `sendAsset({ invoice })` for an
+  any-amount invoice uses `INVALID_PARAMS`
+  ([#4](https://github.com/kaleidoswap/webrgb/issues/4)).
+
+### Changed
+
+- `ProviderErrorCode` has two more members, so a `switch` that must be total
+  now needs cases for them. A dApp must still treat an unrecognised code as
+  `INTERNAL_ERROR`: wallets older than this version never send the new ones.
+- The mock rejects an unknown asset with `ASSET_NOT_FOUND` and a malformed
+  asset id or invoice with `INVALID_PARAMS`, where it used `INTERNAL_ERROR`.
+
 ## [0.2.0] - 2026-09-21
 
 The KaleidoSwap extension 0.3.0 is the first release that injects

@@ -31,6 +31,9 @@ async function useRgb(): Promise<void> {
   if (!info.ready) return;
 
   const { invoice } = await window.rgb.blindReceive({ assetId: "rgb:x", amount: 1 });
+  // No asset id: an invoice that accepts any asset.
+  const anyAsset = await window.rgb.blindReceive();
+  anyAsset.minConfirmations?.toFixed();
   const sent = await window.rgb.sendAsset({ invoice });
   sent.txid?.toUpperCase();
   await window.rgb.sendAsset({ assetId: "rgb:x", amount: 1, recipientId: "utxob:y" });

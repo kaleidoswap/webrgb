@@ -90,14 +90,27 @@ around them.
   `issueAsset` only when the runtime can mint.
 - **`getAddress()`** returns a Bitcoin address of the wallet that anchors its
   RGB state. It is not an RGB invoice.
-- **`blindReceive({ assetId, amount?, … })`** returns an RGB invoice against a
-  blinded UTXO. Omitting `amount` means any amount.
+- **`blindReceive({ assetId?, amount?, minConfirmations?, … })`** returns an
+  RGB invoice against a blinded UTXO. Omitting `amount` means any amount.
+  Omitting `assetId` means any asset: the invoice names no contract, and it is
+  the only way to receive an asset the wallet has never held, since a wallet
+  can only name a contract it already knows. An `assetId` the wallet does not
+  know MUST reject with `ASSET_NOT_FOUND`, not `INTERNAL_ERROR`.
+  A wallet SHOULD NOT accept fewer than 3 confirmations for `minConfirmations`:
+  RGB wallets do not handle reorgs today, so a transfer accepted as settled
+  whose anchoring transaction is later reorged out loses the received assets.
+  A wallet MAY enforce a higher floor, and SHOULD raise a lower request to its
+  floor rather than reject. The confirmation MUST show the value actually used,
+  and the result MUST carry it as `minConfirmations`.
 - **`issueAsset({ schema, ticker, name, amounts, precision? })`** mints.
   `schema` is `"nia"`, `"uda"` or `"cfa"`; a wallet that cannot serve a schema
   MUST reject with `METHOD_NOT_SUPPORTED` rather than substituting another.
 - **`sendAsset(args)`** takes either `{ invoice }` (preferred) or the explicit
   `{ assetId, amount, recipientId }`. It returns at least the wallet's handle
   on the transfer — `txid` and/or `transferId` — so the page can track it.
+  A wallet MAY refuse `{ invoice }` for an any-amount invoice, since nothing
+  in the request fixes what leaves the wallet; it MUST then reject with
+  `INVALID_PARAMS`, and the explicit form is how a page pays one.
 - **`listAssets()`** and **`listTransfers(assetId?)`** MUST return arrays.
   (Wallets that wrap them exist; `toAssetArray` / `toTransferArray` in this
   package tolerate that, and the conformance suite reports it.)
@@ -109,6 +122,11 @@ around them.
   show it before calling `sendAsset`. It MUST NOT prompt and MUST NOT move
   anything. `amount` MUST be the same number the wallet's own confirmation
   would show, and `null` for an any-amount invoice rather than `0`.
+  An invoice whose fungible assignment is `0` is an any-amount invoice: rgb-lib
+  writes an unconstrained invoice both as `Assignment::Any` and as
+  `Assignment::Fungible(0)`, and a wallet MUST read the two the same way —
+  `amount: null` here, and the amount the user or the page supplies on send —
+  never as a request for zero. Issuers SHOULD prefer `Any`, which says so.
 - **`makeLnInvoice(args)`** returns a BOLT-11 invoice carrying the asset. The
   node enforces a minimum HTLC value, so the wallet MAY raise `amountSats`; the
   confirmation MUST show the figure actually encoded.
@@ -137,7 +155,15 @@ Every rejection MUST be an `Error` carrying a `code`:
 | `USER_REJECTED` | The user declined the connection or a confirmation |
 | `NOT_ENABLED` | Called before `enable()` resolved for this origin |
 | `METHOD_NOT_SUPPORTED` | This wallet cannot serve this method |
+| `INVALID_PARAMS` | An argument is malformed or out of range; `message` names it |
+| `ASSET_NOT_FOUND` | The call names an asset the wallet does not know |
 | `INTERNAL_ERROR` | Anything else; `message` carries the detail |
+
+A wallet SHOULD reject bad arguments with `INVALID_PARAMS` before raising any
+confirmation. A code a wallet's own backend produces MUST be mapped onto this
+table, never forwarded as-is. A dApp MUST treat a code it does not recognise
+as `INTERNAL_ERROR`: older wallets predate `INVALID_PARAMS` and
+`ASSET_NOT_FOUND`, and later versions may add codes.
 
 A dApp MUST NOT rely on `instanceof`: the error crosses a `postMessage`
 boundary and arrives as a plain `Error`. Use `isProviderError()`.

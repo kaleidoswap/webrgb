@@ -49,7 +49,7 @@ try {
 |--------|---------|
 | `enable()` / `getInfo()` | Connect the origin; learn network, runtime and served methods |
 | `getAddress()` | Bitcoin address that anchors the wallet's RGB state |
-| `blindReceive(args)` | Blinded-UTXO receive invoice for an asset |
+| `blindReceive(args?)` | Blinded-UTXO receive invoice; omit `assetId` for any asset, including one the wallet has never held |
 | `issueAsset(args)` | Mint a new asset (gated by its own wallet capability) |
 | `listAssets()` / `getAssetBalance(id)` | Holdings |
 | `sendAsset(args)` | Send against an RGB invoice, or explicitly |
@@ -122,6 +122,8 @@ console.log(formatReport(await runConformance(window.rgb!)));
 | `USER_REJECTED` | The user declined the connection or the confirmation prompt |
 | `NOT_ENABLED` | Called before `enable()` resolved for this origin |
 | `METHOD_NOT_SUPPORTED` | The connected wallet cannot serve this method, or no provider was found |
+| `INVALID_PARAMS` | An argument is malformed or out of range; `error.message` names it |
+| `ASSET_NOT_FOUND` | The call names an asset the wallet does not know — for `blindReceive`, omit `assetId` |
 | `INTERNAL_ERROR` | Anything else; see `error.message` |
 
 The error crosses a `postMessage` boundary on its way out of the wallet, so what you catch is a plain `Error` carrying `code` — `instanceof` will not help. Use `isProviderError(err)`, or `providerErrorCode(err)` for a `switch` that must be total.

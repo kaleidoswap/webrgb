@@ -17,6 +17,8 @@ export type ProviderErrorCode =
   | "USER_REJECTED"
   | "NOT_ENABLED"
   | "METHOD_NOT_SUPPORTED"
+  | "INVALID_PARAMS"
+  | "ASSET_NOT_FOUND"
   | "INTERNAL_ERROR";
 
 /** Every code, in the order the README documents them. */
@@ -94,10 +96,19 @@ export interface RgbInfo {
 export declare function supports(info: Pick<RgbInfo, "methods">, method: RgbMethod): boolean;
 
 export interface RgbBlindReceiveArgs {
-  assetId: string;
+  /**
+   * Omit for an invoice that accepts any asset — the only way to receive an
+   * asset the wallet has never held. An id the wallet does not know rejects
+   * with `ASSET_NOT_FOUND`.
+   */
+  assetId?: string;
   /** Omit for an any-amount invoice. */
   amount?: number;
   durationSeconds?: number;
+  /**
+   * Raised to the wallet's floor — at least 3, since RGB reorgs are not handled
+   * and would lose the assets. The result carries the value used.
+   */
   minConfirmations?: number;
 }
 
@@ -105,6 +116,8 @@ export interface RgbBlindReceiveResult {
   invoice: string;
   recipientId?: string;
   expirationTimestamp?: number;
+  /** Confirmations the wallet will wait for — at least what was asked. */
+  minConfirmations?: number;
 }
 
 export interface RgbIssueAssetArgs {
@@ -203,8 +216,9 @@ export declare function toTransferArray(result: unknown): RgbTransfer[];
 export interface RgbDecodedInvoice {
   assetId?: string;
   /**
-   * Units the invoice moves, or `null` for an any-amount invoice — which a
-   * wallet may refuse to pay unattended, since nothing fixes what leaves it.
+   * Units the invoice moves, or `null` for an any-amount invoice — including
+   * one whose fungible assignment is `0`. A wallet may refuse to pay one
+   * unattended, since nothing fixes what leaves it.
    */
   amount: number | null;
   recipientId?: string;
@@ -262,7 +276,7 @@ export interface RgbProvider {
   getInfo(): Promise<RgbInfo>;
   /** Bitcoin address of the RGB wallet, used to anchor RGB state. */
   getAddress(): Promise<{ address: string }>;
-  blindReceive(args: RgbBlindReceiveArgs): Promise<RgbBlindReceiveResult>;
+  blindReceive(args?: RgbBlindReceiveArgs): Promise<RgbBlindReceiveResult>;
   issueAsset(args: RgbIssueAssetArgs): Promise<RgbIssueAssetResult>;
   listAssets(): Promise<RgbAssetList>;
   getAssetBalance(assetId: string): Promise<RgbAssetBalance>;

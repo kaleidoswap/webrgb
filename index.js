@@ -9,6 +9,8 @@ export const RGB_ERROR_CODES = Object.freeze([
   "USER_REJECTED",
   "NOT_ENABLED",
   "METHOD_NOT_SUPPORTED",
+  "INVALID_PARAMS",
+  "ASSET_NOT_FOUND",
   "INTERNAL_ERROR",
 ]);
 

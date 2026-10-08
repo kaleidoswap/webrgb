@@ -19,7 +19,7 @@ import type {
   RgbProviderDetail,
   RgbTransfer,
 } from "@kaleidorg/webrgb";
-import { createMockProvider, installMockProvider } from "@kaleidorg/webrgb/mock";
+import { createMockProvider, installMockProvider, mockPsbt } from "@kaleidorg/webrgb/mock";
 import type { MockRgbProvider } from "@kaleidorg/webrgb/mock";
 import { formatReport, runConformance } from "@kaleidorg/webrgb/conformance";
 import type { ConformanceReport } from "@kaleidorg/webrgb/conformance";
@@ -58,6 +58,28 @@ async function useRgb(): Promise<void> {
     paid.assetAmount?.toFixed(0);
     await window.rgb.payLnInvoice(ln.invoice);
   }
+
+  // 0.4: bitcoin side, receive housekeeping, metadata, vanilla PSBTs.
+  if (supports(info, "getBtcBalance")) {
+    const btc = await window.rgb.getBtcBalance();
+    if (btc.freeColorableUtxos === 0) {
+      if (supports(info, "witnessReceive")) await window.rgb.witnessReceive({ amount: 1 });
+      else await window.rgb.createUtxos({ num: 1, size: 3000 });
+    }
+    btc.vanilla.spendable.toFixed();
+  }
+  const pending = await window.rgb.blindReceive();
+  const { cancelled } = await window.rgb.cancelReceive(pending.recipientId ?? "");
+  void cancelled;
+  const { refreshed }: { refreshed: boolean } = await window.rgb.refresh("rgb:x");
+  void refreshed;
+  const meta = await window.rgb.getAssetMetadata("rgb:x");
+  meta.ticker?.toLowerCase();
+  meta.media?.mime.length;
+  const signed = await window.rgb.signPsbt("cHNidP8B", { finalize: true });
+  signed.signedInputs.toFixed();
+  // @ts-expect-error the PSBT is a base64 string
+  await window.rgb.signPsbt(new Uint8Array());
 
   const onSettled = (t: RgbTransfer): void => {
     t.status === "Settled";
@@ -103,6 +125,7 @@ function handle(err: unknown): ProviderErrorCode {
   if (isProviderError(err)) {
     const code: ProviderErrorCode = err.code;
     if (code === "USER_REJECTED") return code;
+    if (code === "NO_AVAILABLE_UTXOS" || code === "UNSAFE_PSBT") return code;
   }
   // @ts-expect-error the codes are a closed union
   const bogus: ProviderErrorCode = "NOPE";
@@ -126,6 +149,7 @@ async function useMockAndConformance(): Promise<void> {
   mock.emit("transferReceived", { assetId: issued.assetId });
   mock.settle(1);
   mock.calls.map((c) => c.method);
+  await mock.signPsbt(mockPsbt({ inputs: [{ mine: true }] }));
   mock.reset();
 
   const installed = installMockProvider({ info: { name: "Example" } });

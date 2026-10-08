@@ -19,6 +19,8 @@ export type ProviderErrorCode =
   | "METHOD_NOT_SUPPORTED"
   | "INVALID_PARAMS"
   | "ASSET_NOT_FOUND"
+  | "NO_AVAILABLE_UTXOS"
+  | "UNSAFE_PSBT"
   | "INTERNAL_ERROR";
 
 /** Every code, in the order the README documents them. */
@@ -66,6 +68,13 @@ export type RgbMethod =
   | "getInfo"
   | "getAddress"
   | "blindReceive"
+  | "witnessReceive"
+  | "createUtxos"
+  | "cancelReceive"
+  | "getBtcBalance"
+  | "refresh"
+  | "getAssetMetadata"
+  | "signPsbt"
   | "issueAsset"
   | "listAssets"
   | "getAssetBalance"
@@ -118,6 +127,63 @@ export interface RgbBlindReceiveResult {
   expirationTimestamp?: number;
   /** Confirmations the wallet will wait for — at least what was asked. */
   minConfirmations?: number;
+}
+
+export interface RgbCreateUtxosArgs {
+  /** How many UTXOs to create. Wallet default when omitted. */
+  num?: number;
+  /** Sats per UTXO. Wallet default when omitted. */
+  size?: number;
+  /** sat/vB. The wallet's estimate when omitted. */
+  feeRate?: number;
+}
+
+export interface RgbCreateUtxosResult {
+  created: number;
+  size: number;
+  feeRate?: number;
+}
+
+/** One side of the wallet's bitcoin, in sats. */
+export interface RgbBtcBalanceSide {
+  settled: number;
+  future: number;
+  spendable: number;
+}
+
+/** Aggregate figures only: a wallet never exposes outpoints through it. */
+export interface RgbBtcBalance {
+  vanilla: RgbBtcBalanceSide;
+  colored: RgbBtcBalanceSide;
+  /**
+   * Colorable UTXOs with no RGB allocation, settled or pending, and not
+   * reserved by a pending receive; `null` when the wallet cannot tell.
+   * `0` means `blindReceive` will reject with `NO_AVAILABLE_UTXOS`.
+   */
+  freeColorableUtxos: number | null;
+}
+
+export interface RgbAssetMetadata {
+  assetId: string;
+  schema: "nia" | "uda" | "cfa" | "ifa" | (string & {});
+  ticker: string | null;
+  name: string;
+  details: string | null;
+  precision: number;
+  issuedSupply: number;
+  timestamp: number;
+  media: { mime: string; digest: string } | null;
+}
+
+export interface RgbSignPsbtOptions {
+  /** Return a finalized PSBT. */
+  finalize?: boolean;
+}
+
+export interface RgbSignPsbtResult {
+  /** Base64. */
+  psbt: string;
+  signedInputs: number;
 }
 
 export interface RgbIssueAssetArgs {
@@ -276,7 +342,36 @@ export interface RgbProvider {
   getInfo(): Promise<RgbInfo>;
   /** Bitcoin address of the RGB wallet, used to anchor RGB state. */
   getAddress(): Promise<{ address: string }>;
+  /**
+   * Rejects with `NO_AVAILABLE_UTXOS` when the wallet has no free colorable
+   * UTXO; offer {@link RgbProvider.createUtxos} or
+   * {@link RgbProvider.witnessReceive} then.
+   */
   blindReceive(args?: RgbBlindReceiveArgs): Promise<RgbBlindReceiveResult>;
+  /**
+   * A witness invoice: the sender funds a new UTXO, so it works on an empty
+   * wallet. Same arguments and result as `blindReceive`.
+   */
+  witnessReceive(args?: RgbBlindReceiveArgs): Promise<RgbBlindReceiveResult>;
+  /** Spend on-chain bitcoin to create colorable UTXOs. Prompts. */
+  createUtxos(args?: RgbCreateUtxosArgs): Promise<RgbCreateUtxosResult>;
+  /**
+   * Fail a pending receive this wallet created, releasing the UTXO it
+   * reserved. `cancelled: false` when it is unknown or no longer pending.
+   */
+  cancelReceive(recipientId: string): Promise<{ cancelled: boolean }>;
+  /** Read-only. */
+  getBtcBalance(): Promise<RgbBtcBalance>;
+  /** Sync and advance pending transfers. Read-only from the user's side; no prompt. */
+  refresh(assetId?: string): Promise<{ refreshed: boolean }>;
+  /** Read-only. An unknown asset rejects with `ASSET_NOT_FOUND`. */
+  getAssetMetadata(assetId: string): Promise<RgbAssetMetadata>;
+  /**
+   * Sign the inputs this wallet controls in a base64 PSBT. Rejects with
+   * `UNSAFE_PSBT`, before prompting, when any of them holds an RGB
+   * allocation: signing it outside a state transition destroys the assets.
+   */
+  signPsbt(psbt: string, opts?: RgbSignPsbtOptions): Promise<RgbSignPsbtResult>;
   issueAsset(args: RgbIssueAssetArgs): Promise<RgbIssueAssetResult>;
   listAssets(): Promise<RgbAssetList>;
   getAssetBalance(assetId: string): Promise<RgbAssetBalance>;

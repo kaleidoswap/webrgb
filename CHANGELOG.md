@@ -6,6 +6,39 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-08
+
+### Added
+
+- `witnessReceive(args?)`: a witness invoice the sender funds, so a wallet with
+  no colorable UTXO can still receive. Same arguments and result as
+  `blindReceive`.
+- `createUtxos({ num?, size?, feeRate? })`: spend on-chain bitcoin to create
+  colorable UTXOs. Prompts.
+- `cancelReceive(recipientId)`: fail a pending receive and release the UTXO it
+  reserved. Prompts.
+- `getBtcBalance()`: vanilla and colored bitcoin, plus `freeColorableUtxos`.
+  Aggregate figures only, never outpoints.
+- `refresh(assetId?)`: sync and advance pending transfers.
+- `getAssetMetadata(assetId)`: the asset's contract data.
+- `signPsbt(psbt, { finalize? })`: sign the wallet's vanilla inputs in a
+  base64 PSBT. SPEC.md requires a wallet to refuse, before prompting, a PSBT
+  in which an input it would sign holds RGB assets.
+- Error codes `NO_AVAILABLE_UTXOS` (no free colorable UTXO for a blinded
+  receive or a send) and `UNSAFE_PSBT`.
+- The mock models colorable UTXOs and bitcoin (`freeColorableUtxos`,
+  `vanillaSats`) and serves every new method. It cannot sign Bitcoin:
+  `signPsbt` reads PSBTs built with the new `mockPsbt()` helper.
+- Conformance checks `getBtcBalance-shape`, `getAssetMetadata-miss`,
+  `getAssetMetadata-shape` and `refresh-shape`, run only when `methods` lists
+  the method.
+- The playground has controls for every new method.
+
+### Changed
+
+- `ProviderErrorCode` has two more members, so a total `switch` needs cases
+  for them. Wallets older than this version never send them.
+
 ## [0.3.0] - 2026-09-26
 
 Resolves [#2](https://github.com/kaleidoswap/webrgb/issues/2) and

@@ -230,6 +230,63 @@ export async function runConformance(provider, options = {}) {
     return "the wallet decoded a malformed invoice instead of rejecting";
   });
 
+  await check("getBtcBalance-shape", async () => {
+    const seen = info;
+    if (!seen || !supports(seen, "getBtcBalance")) return "the wallet does not serve getBtcBalance";
+    const balance = await provider.getBtcBalance();
+    for (const side of /** @type {const} */ (["vanilla", "colored"])) {
+      for (const field of /** @type {const} */ (["settled", "future", "spendable"])) {
+        assert(typeof balance?.[side]?.[field] === "number", `${side}.${field} is not a number`);
+      }
+    }
+    assert(
+      balance.freeColorableUtxos === null || typeof balance.freeColorableUtxos === "number",
+      "freeColorableUtxos is neither a number nor null",
+    );
+    const leak = findOutpoint(balance);
+    assert(!leak, `getBtcBalance() exposes an outpoint (${leak})`);
+  });
+
+  await check("getAssetMetadata-miss", async () => {
+    const seen = info;
+    if (!seen || !supports(seen, "getAssetMetadata")) return "the wallet does not serve getAssetMetadata";
+    try {
+      await provider.getAssetMetadata("rgb:webrgb-conformance-no-such-asset");
+    } catch (err) {
+      const code = providerErrorCode(err);
+      assert(code === "ASSET_NOT_FOUND", `an unknown asset rejected with ${code}, not ASSET_NOT_FOUND`);
+      return;
+    }
+    throw new Error("getAssetMetadata() answered for an unknown asset");
+  });
+
+  await check("getAssetMetadata-shape", async () => {
+    const seen = info;
+    if (!seen || !supports(seen, "getAssetMetadata")) return "the wallet does not serve getAssetMetadata";
+    if (!assetId) return "the wallet holds no asset and none was passed";
+    const meta = await provider.getAssetMetadata(assetId);
+    assert(meta.assetId === assetId, "assetId does not echo back");
+    assert(typeof meta.schema === "string", "schema is not a string");
+    assert(meta.ticker === null || typeof meta.ticker === "string", "ticker is neither a string nor null");
+    assert(typeof meta.name === "string", "name is not a string");
+    assert(meta.details === null || typeof meta.details === "string", "details is neither a string nor null");
+    for (const field of /** @type {const} */ (["precision", "issuedSupply", "timestamp"])) {
+      assert(typeof meta[field] === "number", `${field} is not a number`);
+    }
+    assert(
+      meta.media === null ||
+        (typeof meta.media?.mime === "string" && typeof meta.media?.digest === "string"),
+      "media is neither { mime, digest } nor null",
+    );
+  });
+
+  await check("refresh-shape", async () => {
+    const seen = info;
+    if (!seen || !supports(seen, "refresh")) return "the wallet does not serve refresh";
+    const result = await provider.refresh();
+    assert(typeof result?.refreshed === "boolean", "refreshed is not a boolean");
+  });
+
   await check("events-register", () => {
     /** @param {import("./index.js").RgbTransfer} _transfer */
     const listener = (_transfer) => {};
@@ -238,6 +295,26 @@ export async function runConformance(provider, options = {}) {
   });
 
   return summarise(checks);
+}
+
+/**
+ * The path of the first field that looks like an outpoint, or `undefined`.
+ * @param {unknown} value
+ * @param {string} [path]
+ * @returns {string | undefined}
+ */
+function findOutpoint(value, path = "") {
+  if (typeof value === "string") {
+    return /^[0-9a-f]{64}:\d+$/i.test(value) ? path || "(root)" : undefined;
+  }
+  if (!value || typeof value !== "object") return undefined;
+  for (const [key, inner] of Object.entries(value)) {
+    const at = path ? `${path}.${key}` : key;
+    if (/^(outpoints?|txid|vout|utxos|unspents)$/i.test(key)) return at;
+    const found = findOutpoint(inner, at);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /**

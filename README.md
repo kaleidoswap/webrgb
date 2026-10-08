@@ -50,6 +50,11 @@ try {
 | `enable()` / `getInfo()` | Connect the origin; learn network, runtime and served methods |
 | `getAddress()` | Bitcoin address that anchors the wallet's RGB state |
 | `blindReceive(args?)` | Blinded-UTXO receive invoice; omit `assetId` for any asset, including one the wallet has never held |
+| `witnessReceive(args?)` | Witness receive invoice: the sender funds the UTXO, so it works on an empty wallet |
+| `createUtxos(args?)` / `getBtcBalance()` | Create colorable UTXOs from on-chain bitcoin; read vanilla and colored balances and how many UTXOs are free |
+| `cancelReceive(recipientId)` | Cancel a pending receive and release its UTXO |
+| `refresh(id?)` / `getAssetMetadata(id)` | Sync pending transfers; read an asset's contract data |
+| `signPsbt(psbt, opts?)` | Sign the wallet's bitcoin-only inputs in a PSBT |
 | `issueAsset(args)` | Mint a new asset (gated by its own wallet capability) |
 | `listAssets()` / `getAssetBalance(id)` | Holdings |
 | `sendAsset(args)` | Send against an RGB invoice, or explicitly |
@@ -61,6 +66,32 @@ try {
 Feature-detect with `supports(info, method)` rather than assuming a method exists: a node-less wallet rejects the Lightning methods with `METHOD_NOT_SUPPORTED`.
 
 `listAssets()` and `listTransfers()` are typed wide because wallets differ on whether they wrap the array — pass them through `toAssetArray()` / `toTransferArray()`.
+
+## Receiving into an empty wallet
+
+A blinded invoice needs a free colorable UTXO. A fresh wallet, or one whose UTXOs all hold assets, has none and rejects with `NO_AVAILABLE_UTXOS`. A faucet-style page can then ask the wallet to create some, or fall back to a witness invoice, which the sender funds:
+
+```ts
+import { providerErrorCode, supports } from "@kaleidorg/webrgb";
+import type { RgbInfo, RgbProvider } from "@kaleidorg/webrgb";
+
+async function receiveInvoice(rgb: RgbProvider, info: RgbInfo): Promise<string> {
+  try {
+    return (await rgb.blindReceive()).invoice;
+  } catch (err) {
+    if (providerErrorCode(err) !== "NO_AVAILABLE_UTXOS") throw err;
+    if (supports(info, "witnessReceive")) return (await rgb.witnessReceive()).invoice;
+    await rgb.createUtxos(); // spends on-chain bitcoin; the wallet asks first
+    return (await rgb.blindReceive()).invoice;
+  }
+}
+```
+
+`getBtcBalance().freeColorableUtxos` tells you up front, and `cancelReceive(recipientId)` releases the UTXO an abandoned invoice reserved.
+
+## Signing PSBTs
+
+`signPsbt(psbt)` signs only inputs the wallet controls, and only bitcoin-only ones. Spending a UTXO that carries RGB assets outside an RGB state transition destroys the assets, so a wallet rejects such a PSBT with `UNSAFE_PSBT` before showing a prompt. Do not build PSBTs over the wallet's colored UTXOs; RGB-aware PSBT flows are for a later version.
 
 ## Discovery
 
@@ -92,7 +123,7 @@ announceProvider({
 `@kaleidorg/webrgb/mock` is an in-memory provider that enforces the same rules a real one does — `NOT_ENABLED` before `enable()`, `METHOD_NOT_SUPPORTED` for anything absent from `getInfo().methods`, a confirmation step you can make refuse:
 
 ```ts
-import { createMockProvider, installMockProvider } from "@kaleidorg/webrgb/mock";
+import { createMockProvider, installMockProvider, mockPsbt } from "@kaleidorg/webrgb/mock";
 
 // In a test:
 const rgb = createMockProvider({ protocol: "RGB_LN", assets: [{ id: "rgb:x", balance: 100 }] });
@@ -100,6 +131,9 @@ await rgb.enable();
 const sent = await rgb.sendAsset({ assetId: "rgb:x", amount: 1, recipientId: "utxob:y" });
 rgb.settle(sent.transferId!); // fires transferSettled
 expect(rgb.calls.map((c) => c.method)).toContain("sendAsset");
+
+// signPsbt cannot really sign; it reads PSBTs built with mockPsbt().
+await rgb.signPsbt(mockPsbt({ inputs: [{ mine: true }] }));
 
 // In a dev build: put it on window.rgb and let the app find it as usual.
 const { uninstall } = installMockProvider();
@@ -124,6 +158,8 @@ console.log(formatReport(await runConformance(window.rgb!)));
 | `METHOD_NOT_SUPPORTED` | The connected wallet cannot serve this method, or no provider was found |
 | `INVALID_PARAMS` | An argument is malformed or out of range; `error.message` names it |
 | `ASSET_NOT_FOUND` | The call names an asset the wallet does not know — for `blindReceive`, omit `assetId` |
+| `NO_AVAILABLE_UTXOS` | No free colorable UTXO — call `createUtxos()` or use `witnessReceive()` |
+| `UNSAFE_PSBT` | `signPsbt` was asked to sign an input that holds RGB assets |
 | `INTERNAL_ERROR` | Anything else; see `error.message` |
 
 The error crosses a `postMessage` boundary on its way out of the wallet, so what you catch is a plain `Error` carrying `code` — `instanceof` will not help. Use `isProviderError(err)`, or `providerErrorCode(err)` for a `switch` that must be total.

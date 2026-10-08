@@ -70,7 +70,7 @@ Beyond the connection, consent is per call:
 | `blindReceive` | MUST | Creates an invoice that binds a UTXO |
 | `witnessReceive` | MUST | Creates an invoice the sender funds; the confirmation MUST say "witness" |
 | `createUtxos` | MUST | Spends on-chain bitcoin |
-| `cancelReceive` | MUST | Fails a pending receive |
+| `cancelReceive` | MUST | Fails a pending receive; MAY skip the prompt when nothing would be cancelled |
 | `signPsbt` | MUST | Signs a transaction |
 | `issueAsset` | MUST | Mints; MAY also require a separate wallet capability |
 | `sendAsset` | MUST | Moves assets |
@@ -123,7 +123,9 @@ around them.
   releasing the UTXO a blinded invoice reserved, and resolves
   `{ cancelled: true }`. Only a receive still `WaitingCounterparty` can be
   cancelled; any other state, and an unknown `recipientId`, MUST resolve
-  `{ cancelled: false }` rather than reject. A malformed `recipientId` MUST
+  `{ cancelled: false }` rather than reject. The wallet MUST prompt before
+  cancelling anything; when nothing would change it MAY resolve
+  `{ cancelled: false }` without a prompt. A malformed `recipientId` MUST
   reject with `INVALID_PARAMS`.
 - **`getBtcBalance()`** returns `{ vanilla, colored, freeColorableUtxos }`.
   `vanilla` and `colored` each carry `settled`, `future` and `spendable` in

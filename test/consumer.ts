@@ -80,6 +80,10 @@ async function useRgb(): Promise<void> {
   signed.signedInputs.toFixed();
   // @ts-expect-error the PSBT is a base64 string
   await window.rgb.signPsbt(new Uint8Array());
+  const { signature }: { signature: string } = await window.rgb.signMessage("login:nonce");
+  void signature;
+  // @ts-expect-error message is a string
+  await window.rgb.signMessage({ text: "x" });
 
   const onSettled = (t: RgbTransfer): void => {
     t.status === "Settled";

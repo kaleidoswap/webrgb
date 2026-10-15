@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `signMessage(message)`: sign a string in the LND `signmessage` format
+  (zbase32, public key recoverable), so a dApp backend can authenticate the
+  wallet with a challenge. Prompts with the message and the origin. The mock
+  returns a deterministic stand-in signature.
+- SPEC.md §1 describes transport adapters: a wallet outside the page, such as
+  a mobile app, MAY serve the same interface through a library that relays
+  calls over a paired session instead of injecting `window.rgb`.
+
 ## [0.4.0] - 2026-10-08
 
 ### Added

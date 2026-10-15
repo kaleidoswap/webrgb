@@ -13,8 +13,8 @@ conventions.
 
 ## 1. Installing a provider
 
-A wallet MUST expose the provider object as `window.rgb` and MUST dispatch a
-`rgb:ready` `CustomEvent` on `window` once it is installed:
+A browser wallet MUST expose the provider object as `window.rgb` and MUST
+dispatch a `rgb:ready` `CustomEvent` on `window` once it is installed:
 
 ```js
 window.rgb = provider;
@@ -26,6 +26,13 @@ A page may run before or after the wallet, so a dApp MUST handle both orders —
 
 `window.rgb` is a single slot. A wallet SHOULD NOT overwrite a provider another
 wallet installed; it MUST still announce itself (§2) so the page can choose.
+
+A wallet that does not run in the page — a mobile app, a remote signer — MAY
+serve the same interface through a transport adapter: a library that gives
+the dApp a local object implementing `RgbProvider` and relays each call to
+the wallet over a pairing channel (a QR code or deep link, then an encrypted
+session). The dApp then skips injection and discovery; everything from §3 on
+applies unchanged, and consent is still given in the wallet.
 
 ## 2. Discovery
 
@@ -72,6 +79,7 @@ Beyond the connection, consent is per call:
 | `createUtxos` | MUST | Spends on-chain bitcoin |
 | `cancelReceive` | MUST | Fails a pending receive; MAY skip the prompt when nothing would be cancelled |
 | `signPsbt` | MUST | Signs a transaction |
+| `signMessage` | MUST | Shows the message and the requesting origin |
 | `issueAsset` | MUST | Mints; MAY also require a separate wallet capability |
 | `sendAsset` | MUST | Moves assets |
 | `makeLnInvoice`, `payLnInvoice` | MUST | Moves, or commits to receiving, assets over Lightning |
@@ -96,6 +104,14 @@ around them.
   lists those its node supports and rejects the rest.
 - **`getAddress()`** returns a Bitcoin address of the wallet that anchors its
   RGB state. It is not an RGB invoice.
+- **`signMessage(message)`** signs a UTF-8 string and returns `{ signature }`
+  in the LND `signmessage` format: zbase32, recoverable, over the message
+  prefixed with `Lightning Signed Message:`. A verifier recovers the public
+  key from the signature, so a backend can bind a session to it with a
+  challenge it issued. The wallet signs with a key it keeps stable across
+  calls, so the recovered key identifies it from one session to the next. The wallet
+  MUST show the message unchanged with the requesting origin, and MUST reject
+  an empty or non-string `message` with `INVALID_PARAMS` before prompting.
 - **`blindReceive({ assetId?, amount?, minConfirmations?, … })`** returns an
   RGB invoice against a blinded UTXO. Omitting `amount` means any amount.
   Omitting `assetId` means any asset: the invoice names no contract, and it is

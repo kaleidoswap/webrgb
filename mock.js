@@ -16,6 +16,7 @@ const BASE_METHODS = [
   "refresh",
   "getAssetMetadata",
   "signPsbt",
+  "signMessage",
   "issueAsset",
   "listAssets",
   "getAssetBalance",
@@ -278,6 +279,25 @@ export function createMockProvider(options = {}) {
         finalized: opts.finalize === true,
       };
       return { psbt: btoa(JSON.stringify(signed)), signedInputs: mine.length };
+    },
+
+    /** @param {string} message */
+    async signMessage(message) {
+      await call("signMessage", [message]);
+      if (typeof message !== "string" || message.length === 0) {
+        throw fail("message must be a non-empty string", "INVALID_PARAMS");
+      }
+      confirm();
+      // Not a real signature: a deterministic stand-in in the zbase32 alphabet.
+      let hash = 0;
+      for (const ch of message) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+      const alphabet = "ybndrfg8ejkmcpqxot1uwisza345h769";
+      let signature = "";
+      for (let i = 0; i < 104; i++) {
+        hash = (hash * 1103515245 + 12345) >>> 0;
+        signature += alphabet[hash >>> 27];
+      }
+      return { signature };
     },
 
     /** @param {import("./index.js").RgbIssueAssetArgs} args */

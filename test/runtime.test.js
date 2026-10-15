@@ -485,6 +485,26 @@ describe("mock provider", () => {
     assert.equal((await rgb.getBtcBalance()).freeColorableUtxos, 1);
   });
 
+  it("signs a message deterministically and checks it before prompting", async () => {
+    const rgb = createMockProvider();
+    await rgb.enable();
+    const a = await rgb.signMessage("login:abc");
+    assert.match(a.signature, /^[ybndrfg8ejkmcpqxot1uwisza345h769]{104}$/);
+    assert.deepEqual(await rgb.signMessage("login:abc"), a);
+    assert.notEqual((await rgb.signMessage("login:abd")).signature, a.signature);
+
+    const refusing = createMockProvider({ rejectConfirmations: true });
+    await refusing.enable();
+    await assert.rejects(refusing.signMessage(""), (err) => {
+      assert.equal(providerErrorCode(err), "INVALID_PARAMS");
+      return true;
+    });
+    await assert.rejects(refusing.signMessage("hi"), (err) => {
+      assert.equal(providerErrorCode(err), "USER_REJECTED");
+      return true;
+    });
+  });
+
   it("reads balances, metadata and refreshes without prompting", async () => {
     const rgb = createMockProvider({
       rejectConfirmations: true,

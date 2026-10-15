@@ -75,6 +75,7 @@ export type RgbMethod =
   | "refresh"
   | "getAssetMetadata"
   | "signPsbt"
+  | "signMessage"
   | "issueAsset"
   | "listAssets"
   | "getAssetBalance"
@@ -103,6 +104,11 @@ export interface RgbInfo {
 
 /** `true` when `info.methods` lists `method`. */
 export declare function supports(info: Pick<RgbInfo, "methods">, method: RgbMethod): boolean;
+
+export interface RgbSignMessageResult {
+  /** LND `signmessage` format: zbase32, public key recoverable. */
+  signature: string;
+}
 
 export interface RgbBlindReceiveArgs {
   /**
@@ -372,6 +378,8 @@ export interface RgbProvider {
    * allocation: signing it outside a state transition destroys the assets.
    */
   signPsbt(psbt: string, opts?: RgbSignPsbtOptions): Promise<RgbSignPsbtResult>;
+  /** Sign `message` as shown to the user, in the LND `signmessage` format. Prompts. */
+  signMessage(message: string): Promise<RgbSignMessageResult>;
   issueAsset(args: RgbIssueAssetArgs): Promise<RgbIssueAssetResult>;
   listAssets(): Promise<RgbAssetList>;
   getAssetBalance(assetId: string): Promise<RgbAssetBalance>;

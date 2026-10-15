@@ -55,6 +55,7 @@ try {
 | `cancelReceive(recipientId)` | Cancel a pending receive and release its UTXO |
 | `refresh(id?)` / `getAssetMetadata(id)` | Sync pending transfers; read an asset's contract data |
 | `signPsbt(psbt, opts?)` | Sign the wallet's bitcoin-only inputs in a PSBT |
+| `signMessage(message)` | Sign a string (LND `signmessage` format) to prove control of the wallet |
 | `issueAsset(args)` | Mint a new asset (gated by its own wallet capability) |
 | `listAssets()` / `getAssetBalance(id)` | Holdings |
 | `sendAsset(args)` | Send against an RGB invoice, or explicitly |

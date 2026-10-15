@@ -108,8 +108,8 @@ around them.
   in the LND `signmessage` format: zbase32, recoverable, over the message
   prefixed with `Lightning Signed Message:`. A verifier recovers the public
   key from the signature, so a backend can bind a session to it with a
-  challenge it issued. An `"RGB_LN"` wallet signs with its node key; an
-  `"RGB_L1"` wallet with a key it keeps stable for the origin. The wallet
+  challenge it issued. The wallet signs with a key it keeps stable across
+  calls, so the recovered key identifies it from one session to the next. The wallet
   MUST show the message unchanged with the requesting origin, and MUST reject
   an empty or non-string `message` with `INVALID_PARAMS` before prompting.
 - **`blindReceive({ assetId?, amount?, minConfirmations?, … })`** returns an

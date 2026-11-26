@@ -6,6 +6,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The package moves to the `@kaleidoswap` npm scope: install `@kaleidoswap/webrgb`. `@kaleidorg/webrgb` stops receiving releases and will be deprecated.
+
 ## [0.5.0] - 2026-10-15
 
 ### Added

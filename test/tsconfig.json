@@ -12,13 +12,13 @@
     "skipLibCheck": false,
     "baseUrl": "..",
     "paths": {
-      "@kaleidorg/webrgb": [
+      "@kaleidoswap/webrgb": [
         "./index.d.ts"
       ],
-      "@kaleidorg/webrgb/mock": [
+      "@kaleidoswap/webrgb/mock": [
         "./mock.d.ts"
       ],
-      "@kaleidorg/webrgb/conformance": [
+      "@kaleidoswap/webrgb/conformance": [
         "./conformance.d.ts"
       ]
     },

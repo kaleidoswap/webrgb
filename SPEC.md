@@ -243,11 +243,11 @@ has not been enabled.
 
 ## 7. Conformance
 
-`@kaleidorg/webrgb/conformance` runs the read-only half of this document
+`@kaleidoswap/webrgb/conformance` runs the read-only half of this document
 against a live provider:
 
 ```js
-import { runConformance, formatReport } from "@kaleidorg/webrgb/conformance";
+import { runConformance, formatReport } from "@kaleidoswap/webrgb/conformance";
 console.log(formatReport(await runConformance(window.rgb)));
 ```
 

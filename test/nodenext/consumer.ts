@@ -1,10 +1,10 @@
 // The same package, resolved the way Node and a `moduleResolution: NodeNext`
 // project resolve it: through the "exports" map, by package name. This is what
 // catches a subpath that only works for a bundler.
-import { isProviderError, listProviders, requestProvider, supports } from "@kaleidorg/webrgb";
-import type { RgbInfo, RgbProvider } from "@kaleidorg/webrgb";
-import { createMockProvider, installMockProvider } from "@kaleidorg/webrgb/mock";
-import { formatReport, runConformance } from "@kaleidorg/webrgb/conformance";
+import { isProviderError, listProviders, requestProvider, supports } from "@kaleidoswap/webrgb";
+import type { RgbInfo, RgbProvider } from "@kaleidoswap/webrgb";
+import { createMockProvider, installMockProvider } from "@kaleidoswap/webrgb/mock";
+import { formatReport, runConformance } from "@kaleidoswap/webrgb/conformance";
 
 async function main(): Promise<void> {
   const rgb: RgbProvider = await requestProvider({ enable: true, timeoutMs: 1000 });

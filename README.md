@@ -1,4 +1,4 @@
-# @kaleidorg/webrgb
+# @kaleidoswap/webrgb
 
 **WebRGB** is the `window.rgb` provider a wallet injects into web pages so a dApp can issue, receive, send and track [RGB](https://rgb.tech) assets, and pay or receive them over Lightning, without running its own RGB backend. It sits next to [WebLN](https://www.webln.dev/) (`window.webln`) and WebBTC (`window.webbtc`) and follows the same conventions: one `enable()` consent per origin, a confirmation in the wallet for every funds-touching call, and errors that carry a `code`.
 
@@ -11,7 +11,7 @@ The [playground](https://kaleidoswap.github.io/webrgb/) imports this module and 
 ## Install
 
 ```bash
-npm install @kaleidorg/webrgb
+npm install @kaleidoswap/webrgb
 ```
 
 Importing anything from the package augments `Window`, so `window.rgb` is typed everywhere. For WebLN typings use `@webbtc/webln-types`; for NIP-07 use `nostr-tools`.
@@ -19,7 +19,7 @@ Importing anything from the package augments `Window`, so `window.rgb` is typed 
 ## Usage
 
 ```ts
-import { requestProvider, isProviderError, supports, toAssetArray } from "@kaleidorg/webrgb";
+import { requestProvider, isProviderError, supports, toAssetArray } from "@kaleidoswap/webrgb";
 
 try {
   // Waits for the wallet if the page ran first; `enable` connects the origin.
@@ -73,8 +73,8 @@ Feature-detect with `supports(info, method)` rather than assuming a method exist
 A blinded invoice needs a free colorable UTXO. A fresh wallet, or one whose UTXOs all hold assets, has none and rejects with `NO_AVAILABLE_UTXOS`. A faucet-style page can then ask the wallet to create some, or fall back to a witness invoice, which the sender funds:
 
 ```ts
-import { providerErrorCode, supports } from "@kaleidorg/webrgb";
-import type { RgbInfo, RgbProvider } from "@kaleidorg/webrgb";
+import { providerErrorCode, supports } from "@kaleidoswap/webrgb";
+import type { RgbInfo, RgbProvider } from "@kaleidoswap/webrgb";
 
 async function receiveInvoice(rgb: RgbProvider, info: RgbInfo): Promise<string> {
   try {
@@ -99,7 +99,7 @@ async function receiveInvoice(rgb: RgbProvider, info: RgbInfo): Promise<string> 
 `window.rgb` is a single slot, so two installed wallets cannot both own it. Wallets also announce themselves, EIP-6963 style, and `listProviders()` collects the answers:
 
 ```ts
-import { listProviders } from "@kaleidorg/webrgb";
+import { listProviders } from "@kaleidoswap/webrgb";
 
 for (const { info, provider } of await listProviders()) {
   console.log(info.name, info.rdns); // show a picker, then use `provider`
@@ -111,7 +111,7 @@ for (const { info, provider } of await listProviders()) {
 Wallet side, one call joins discovery:
 
 ```ts
-import { announceProvider } from "@kaleidorg/webrgb";
+import { announceProvider } from "@kaleidoswap/webrgb";
 
 announceProvider({
   info: { uuid: crypto.randomUUID(), name: "Example", rdns: "com.example.wallet" },
@@ -121,10 +121,10 @@ announceProvider({
 
 ## Building without a wallet
 
-`@kaleidorg/webrgb/mock` is an in-memory provider that enforces the same rules a real one does — `NOT_ENABLED` before `enable()`, `METHOD_NOT_SUPPORTED` for anything absent from `getInfo().methods`, a confirmation step you can make refuse:
+`@kaleidoswap/webrgb/mock` is an in-memory provider that enforces the same rules a real one does — `NOT_ENABLED` before `enable()`, `METHOD_NOT_SUPPORTED` for anything absent from `getInfo().methods`, a confirmation step you can make refuse:
 
 ```ts
-import { createMockProvider, installMockProvider, mockPsbt } from "@kaleidorg/webrgb/mock";
+import { createMockProvider, installMockProvider, mockPsbt } from "@kaleidoswap/webrgb/mock";
 
 // In a test:
 const rgb = createMockProvider({ protocol: "RGB_LN", assets: [{ id: "rgb:x", balance: 100 }] });
@@ -142,10 +142,10 @@ const { uninstall } = installMockProvider();
 
 ## Conformance
 
-`@kaleidorg/webrgb/conformance` checks a live wallet against `SPEC.md` using read-only calls only, so it raises no confirmation:
+`@kaleidoswap/webrgb/conformance` checks a live wallet against `SPEC.md` using read-only calls only, so it raises no confirmation:
 
 ```ts
-import { runConformance, formatReport } from "@kaleidorg/webrgb/conformance";
+import { runConformance, formatReport } from "@kaleidoswap/webrgb/conformance";
 
 console.log(formatReport(await runConformance(window.rgb!)));
 ```
